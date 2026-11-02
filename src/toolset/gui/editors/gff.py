@@ -25,6 +25,9 @@ if TYPE_CHECKING:
 _VALUE_NODE_ROLE = QtCore.Qt.UserRole + 1
 _RAW_NODE_ROLE = QtCore.Qt.UserRole + 10
 _ORIGINAL_NODE_ROLE = QtCore.Qt.UserRole + 11
+_STRUCT_BINARY_ROLE = QtCore.Qt.UserRole + 12
+_FIELD_BINARY_ROLE = QtCore.Qt.UserRole + 13
+_SOURCE_KEY_ROLE = QtCore.Qt.UserRole + 14
 _TYPE_NODE_ROLE = QtCore.Qt.UserRole + 2
 _LABEL_NODE_ROLE = QtCore.Qt.UserRole + 3
 
@@ -161,6 +164,7 @@ class GFFEditor(Editor):
         """
         super().load(filepath, resref, restype, data)
         gff: GFF = read_gff(data)
+        self._binary_data = gff._binary_data
 
         self.model.clear()
         self.model.setColumnCount(1)
@@ -191,11 +195,14 @@ class GFFEditor(Editor):
             - Handles list and struct field types recursively
             - Appends the child node to the parent node.
         """
+        node.setData(gffStruct._binary, _STRUCT_BINARY_ROLE)
+        node.setData(gffStruct._source_key, _SOURCE_KEY_ROLE)
         for label, field in gffStruct._field_order:
             ftype, value = field.field_type(), field.value()
             childNode = QStandardItem("")
             childNode.setData(ftype, _TYPE_NODE_ROLE)
             childNode.setData(label, _LABEL_NODE_ROLE)
+            childNode.setData(field._binary, _FIELD_BINARY_ROLE)
             if ftype is GFFFieldType.String:
                 childNode.setData(field.raw_data, _RAW_NODE_ROLE)
                 childNode.setData(value, _ORIGINAL_NODE_ROLE)
@@ -264,6 +271,7 @@ class GFFEditor(Editor):
             content = GFFContent.GFF
 
         gff = GFF(content)
+        gff._binary_data = self._binary_data
 
         self._build_struct(self.model.item(0, 0), gff.root)
 
@@ -287,6 +295,8 @@ class GFFEditor(Editor):
             - Recursively builds child structures and lists.
         """
         struct_id = item.data(_VALUE_NODE_ROLE)
+        gffStruct._binary = item.data(_STRUCT_BINARY_ROLE)
+        gffStruct._source_key = item.data(_SOURCE_KEY_ROLE)
         if struct_id is not None:
             gffStruct.struct_id = struct_id
         for i in range(item.rowCount()):
@@ -304,6 +314,7 @@ class GFFEditor(Editor):
             elif kind is GFFFieldType.String and value == child.data(_ORIGINAL_NODE_ROLE):
                 raw_data = child.data(_RAW_NODE_ROLE)
             gffStruct.add_field(label, kind, value, raw_data=raw_data)
+            gffStruct._field_order[-1][1]._binary = child.data(_FIELD_BINARY_ROLE)
 
     def _build_list(self, item: QStandardItem, gffList: GFFList):
         """Builds a list of GFF structures from a QStandardItem tree.
@@ -329,6 +340,7 @@ class GFFEditor(Editor):
 
     def new(self):
         super().new()
+        self._binary_data = b""
         self.model.clear()
         self.model.setColumnCount(1)
 
