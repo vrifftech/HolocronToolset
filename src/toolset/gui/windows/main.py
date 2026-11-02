@@ -4,6 +4,7 @@ from contextlib import suppress
 from tempfile import mkdtemp
 from typing import TYPE_CHECKING, Callable, ClassVar
 
+from pykotor.common.module import Module
 from pykotor.common.stream import BinaryReader
 from pykotor.extract.file import FileResource, ResourceIdentifier, ResourceResult
 from pykotor.extract.installation import SearchLocation
@@ -163,6 +164,10 @@ class ToolWindow(QMainWindow):
         self.ui.coreWidget.requestOpenResource.connect(self.onOpenResources)
 
         self.ui.modulesWidget.sectionChanged.connect(self.onModuleChanged)
+        self.ui.modulesWidget.sectionChanged.connect(self.updateModule3dLink)
+        self.ui.modulesWidget.sectionModel.modelReset.connect(self.updateModule3dLink)
+        self.ui.resourceTabs.currentChanged.connect(self.updateModule3dLink)
+        self.ui.openModule3dLink.linkActivated.connect(self.openCurrentModuleDesigner)
         self.ui.modulesWidget.requestReload.connect(self.onModuleReload)
         self.ui.modulesWidget.requestRefresh.connect(self.onModuleRefresh)
         self.ui.modulesWidget.requestExtractResource.connect(self.onExtractResources)
@@ -446,6 +451,17 @@ class ToolWindow(QMainWindow):
     def openModuleDesigner(self):
         assert self.active is not None, assert_with_variable_trace(self.active is not None)
         designer = ModuleDesigner(None, self.active)
+        addWindow(designer)
+
+    def updateModule3dLink(self):
+        self.ui.openModule3dLink.setVisible(
+            self.ui.resourceTabs.currentWidget() is self.ui.modulesTab
+            and bool(self.ui.modulesWidget.currentSection())
+        )
+
+    def openCurrentModuleDesigner(self):
+        root = Module.find_root(self.ui.modulesWidget.currentSection())
+        designer = ModuleDesigner(None, self.active, module_root=root)
         addWindow(designer)
 
     def openSettingsDialog(self):

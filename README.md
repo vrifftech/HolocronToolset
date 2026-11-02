@@ -136,10 +136,11 @@ Set `K1_PATH` and `K2_PATH` when testing against local game installations.
 Qt/OpenGL interactions and executable builds require their platform dependencies.
 
 Module Designer opens directly and edits existing modules through its 2D and
-3D views. Select a game installation, then use `Tools > 3D Module Designer`
-or `File > Open Installed Module in 3D...` in the GIT or archive editor.
-The module picker edits installed modules; standalone RIM and GIT files may
-lack the models, textures, and walkmeshes required for 3D editing.
+3D views. Select a module in the Modules tab, then click
+`Open Module in 3D Editor` in the sidebar to edit it directly.
+`Tools > 3D Module Designer` opens the installed-module picker.
+Standalone RIM and GIT files may lack the models, textures, and walkmeshes
+required for 3D editing.
 Generated UI and resource modules are committed because the application
 imports them directly.
 

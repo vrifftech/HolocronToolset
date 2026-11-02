@@ -31,13 +31,6 @@ def addWindow(window: QWidget):
     window.show()
 
 
-def openModuleDesigner(installation: HTInstallation):
-    """Open the installed-module picker for the selected game installation."""
-    from toolset.gui.windows.module_designer import ModuleDesigner
-
-    addWindow(ModuleDesigner(None, installation))
-
-
 def openResourceEditor(
     filepath: os.PathLike | str,
     resref: str,

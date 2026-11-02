@@ -160,6 +160,22 @@
           <number>0</number>
          </property>
          <item>
+          <widget class="QLabel" name="openModule3dLink">
+           <property name="visible">
+            <bool>false</bool>
+           </property>
+           <property name="text">
+            <string>&lt;a href="module-3d"&gt;Open Module in 3D Editor&lt;/a&gt;</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QPushButton" name="openButton">
            <property name="text">
             <string>Open Selected</string>

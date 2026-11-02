@@ -55,13 +55,14 @@ if TYPE_CHECKING:
 
 
 class ModuleDesigner(QMainWindow):
-    def __init__(self, parent: QWidget | None, installation: HTInstallation):
+    def __init__(self, parent: QWidget | None, installation: HTInstallation, *, module_root: str | None = None):
         """Initializes the Module Designer window.
 
         Args:
         ----
             parent: QWidget | None: Parent widget
             installation: HTInstallation: Hometuck installation
+            module_root: Module to open directly; omit to show the module picker.
 
         Processing Logic:
         ----------------
@@ -116,7 +117,7 @@ class ModuleDesigner(QMainWindow):
         self.rebuildResourceTree()
         self.rebuildInstanceList()
 
-        QTimer.singleShot(33, self.openModule)
+        QTimer.singleShot(33, self.openModule if module_root is None else lambda: self.loadModule(module_root))
 
     def _setupSignals(self):
         """Connect signals to slots.
