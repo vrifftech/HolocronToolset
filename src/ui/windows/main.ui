@@ -307,14 +307,13 @@
      <property name="title">
       <string>Discord</string>
      </property>
-     <addaction name="actionDiscordHolocronToolset"/>
+     <addaction name="actionDiscordOpenKotOR"/>
      <addaction name="actionDiscordKotOR"/>
      <addaction name="actionDiscordDeadlyStream"/>
     </widget>
     <addaction name="actionHelpAbout"/>
     <addaction name="menuDiscord"/>
     <addaction name="actionInstructions"/>
-    <addaction name="actionHelpUpdates"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTools"/>
@@ -349,11 +348,6 @@
   <action name="actionOpen">
    <property name="text">
     <string>Open</string>
-   </property>
-  </action>
-  <action name="actionCheck_for_Updates">
-   <property name="text">
-    <string>Check for Updates</string>
    </property>
   </action>
   <action name="actionCreature">
@@ -430,11 +424,6 @@
    </property>
    <property name="text">
     <string>Edit Talk Table</string>
-   </property>
-  </action>
-  <action name="actionHelpUpdates">
-   <property name="text">
-    <string>Check For Updates</string>
    </property>
   </action>
   <action name="actionHelpAbout">
@@ -625,9 +614,9 @@
     <string>Instructions</string>
    </property>
   </action>
-  <action name="actionDiscordHolocronToolset">
+  <action name="actionDiscordOpenKotOR">
    <property name="text">
-    <string>Holocron Toolset</string>
+    <string>OpenKotOR</string>
    </property>
   </action>
   <action name="actionDiscordKotOR">
@@ -645,7 +634,7 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>Module Designer</string>
+    <string>3D Module Designer</string>
    </property>
   </action>
  </widget>

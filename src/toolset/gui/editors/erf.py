@@ -15,7 +15,7 @@ from PyQt5.QtGui import QDragEnterEvent, QDragMoveEvent, QDropEvent, QStandardIt
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QShortcut, QTableView, QWidget
 from toolset.gui.editor import Editor
 from toolset.gui.widgets.settings.installations import GlobalSettings
-from toolset.utils.window import openResourceEditor
+from toolset.utils.window import openModuleDesigner, openResourceEditor
 from utility.error_handling import universal_simplify_exception
 from utility.system.path import Path
 
@@ -37,6 +37,9 @@ class ERFEditor(Editor):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         self._setupMenus()
+        action = self.ui.menuFile.addAction("Open Installed Module in 3D...")
+        action.setToolTip("Choose a module from the selected game installation for 3D editing.")
+        action.triggered.connect(lambda: openModuleDesigner(self._installation))
         self._setupSignals()
 
         self.model = QStandardItemModel(self)

@@ -50,7 +50,7 @@ from toolset.gui.widgets.renderer.walkmesh import GeomPoint
 from toolset.gui.widgets.settings.git import GITSettings
 from toolset.gui.widgets.settings.module_designer import ModuleDesignerSettings
 from toolset.utils.misc import getResourceFromFile
-from toolset.utils.window import openResourceEditor
+from toolset.utils.window import openModuleDesigner, openResourceEditor
 
 if TYPE_CHECKING:
     import os
@@ -106,6 +106,9 @@ class GITEditor(Editor):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         self._setupMenus()
+        action = self.menuBar().actions()[0].menu().addAction("Open Installed Module in 3D...")
+        action.setToolTip("Choose a module from the selected game installation for 3D editing.")
+        action.triggered.connect(lambda: openModuleDesigner(self._installation))
         self._setupSignals()
         self._setupHotkeys()
         self.history = InstanceEditHistory(self, self._refreshHistory)

@@ -136,14 +136,16 @@ Set `K1_PATH` and `K2_PATH` when testing against local game installations.
 Qt/OpenGL interactions and executable builds require their platform dependencies.
 
 Module Designer opens directly and edits existing modules through its 2D and
-3D views. Generated UI and resource modules are committed because the
-application imports them directly.
+3D views. Select a game installation, then use `Tools > 3D Module Designer`
+or `File > Open Installed Module in 3D...` in the GIT or archive editor.
+The module picker edits installed modules; standalone RIM and GIT files may
+lack the models, textures, and walkmeshes required for 3D editing.
+Generated UI and resource modules are committed because the application
+imports them directly.
 
 `src/toolset/data/instance_history.py` implements undo/redo for KotOR Game
 Instance Table (GIT) records, shared by the GIT editor and Module Designer.
 
-Automatic startup/help updates are disabled. Manual application
-and help update actions still refer to the upstream project; use a release
-source compatible with the installed Toolset and PyKotor versions.
+The Help menu opens bundled documentation and links to the project and communities.
 
 See `LICENSE` for licensing.

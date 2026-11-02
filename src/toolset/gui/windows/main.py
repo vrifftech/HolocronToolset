@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import base64
-import json
 from contextlib import suppress
 from tempfile import mkdtemp
 from typing import TYPE_CHECKING, Callable, ClassVar
 
-import requests
 from pykotor.common.stream import BinaryReader
 from pykotor.extract.file import FileResource, ResourceIdentifier, ResourceResult
 from pykotor.extract.installation import SearchLocation
@@ -18,7 +15,6 @@ from pykotor.tools.misc import is_bif_file, is_capsule_file, is_rim_file
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QCloseEvent, QIcon, QPixmap, QStandardItem
 from PyQt5.QtWidgets import QFileDialog, QMainWindow, QMessageBox, QTreeView
-from toolset.config import PROGRAM_VERSION, PROGRAM_VERSION_LABEL, UPDATE_INFO_LINK
 from toolset.data.installation import HTInstallation
 from toolset.gui.dialogs.about import About
 from toolset.gui.dialogs.asyncloader import AsyncBatchLoader, AsyncLoader
@@ -106,7 +102,6 @@ class ToolWindow(QMainWindow):
             - Initializes observer and handler objects
             - Hides unnecessary UI sections on startup
             - Loads settings from file
-            - Checks for updates on first run.
         """
         super().__init__()
 
@@ -137,8 +132,6 @@ class ToolWindow(QMainWindow):
                 self.settings.extractPath = mkdtemp(prefix="HolocronToolset-")
             except Exception as e:
                 print(f"Could not create temp directory: {universal_simplify_exception(e)}")
-
-        # Update checks remain available through the existing Help menu.
 
     def _setupSignals(self):
         """Connects signals to slots for UI interactions.
@@ -216,11 +209,10 @@ class ToolWindow(QMainWindow):
         self.ui.actionFileSearch.triggered.connect(self.openFileSearchDialog)
 
         self.ui.actionInstructions.triggered.connect(self.openInstructionsWindow)
-        self.ui.actionHelpUpdates.triggered.connect(self.checkForUpdates)
         self.ui.actionHelpAbout.triggered.connect(self.openAboutDialog)
         self.ui.actionDiscordDeadlyStream.triggered.connect(lambda: openLink("https://discord.com/invite/bRWyshn"))
         self.ui.actionDiscordKotOR.triggered.connect(lambda: openLink("http://discord.gg/kotor"))
-        self.ui.actionDiscordHolocronToolset.triggered.connect(lambda: openLink("https://discord.gg/3ME278a9tQ"))
+        self.ui.actionDiscordOpenKotOR.triggered.connect(lambda: openLink("https://discord.gg/openkotor"))
 
     # region Signal callbacks
     def onModuleFileUpdated(self, changedFile: str, eventType: str):
@@ -523,56 +515,6 @@ class ToolWindow(QMainWindow):
     def openAboutDialog(self):
         """Opens the about dialog."""
         About(self).exec_()
-
-    def checkForUpdates(self, silent: bool = False):
-        """Scans for any updates and opens a dialog with a message based on the scan result.
-
-        Args:
-        ----
-            silent: If true, only shows popup if an update is available.
-        """
-        try:
-            self._check_toolset_update(silent)
-        except Exception as e:  # noqa: BLE001
-            if not silent:
-                etype, msg = universal_simplify_exception(e)
-                QMessageBox(
-                    QMessageBox.Information,
-                    f"Unable to fetch latest version ({etype})",
-                    f"Check if you are connected to the internet.\nError: {msg}",
-                    QMessageBox.Ok,
-                    self,
-                ).exec_()
-
-    def _check_toolset_update(self, silent: bool):
-        req: requests.Response = requests.get(UPDATE_INFO_LINK, timeout=15)
-        req.raise_for_status()
-        file_data = req.json()
-        base64_content = file_data["content"]
-        decoded_content = base64.b64decode(base64_content)  # Correctly decoding the base64 content
-        data = json.loads(decoded_content.decode("utf-8"))
-
-        toolsetLatestVersion = tuple(map(int, str(data["toolsetLatestVersion"]).split(".")))
-        if toolsetLatestVersion > PROGRAM_VERSION or (
-            toolsetLatestVersion == PROGRAM_VERSION and PROGRAM_VERSION_LABEL.endswith("b")
-        ):
-            toolsetDownloadLink = data["toolsetDownloadLink"]
-
-            QMessageBox(
-                QMessageBox.Information,
-                "New version is available.",
-                f"New version available for <a href='{toolsetDownloadLink}'>download</a>.",
-                QMessageBox.Ok,
-                self,
-            ).exec_()
-        elif not silent:
-            QMessageBox(
-                QMessageBox.Information,
-                "Version is up to date",
-                f"You are running the latest version ({PROGRAM_VERSION_LABEL}).",
-                QMessageBox.Ok,
-                self,
-            ).exec_()
 
     # endregion
 
