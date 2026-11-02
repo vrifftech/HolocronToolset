@@ -1,11 +1,12 @@
 # HolocronToolset
 
-Holocron Toolset **4.0.0b** is a standalone PyQt5 editor for Knights of the
-Old Republic resources. Its Python package version is `4.0.0b0`.
+Holocron Toolset is a standalone mod tool and editor for Knights of the
+Old Republic resources.
 
 ## Setup
 
-Use Python 3.10 or newer and a matching separate PyKotor checkout containing:
+Running from source requires Python 3.10 or newer and a compatible PyKotor
+checkout containing:
 
 ```text
 Libraries/PyKotor/src/pykotor
@@ -13,7 +14,7 @@ Libraries/Utility/src/utility
 Libraries/PyKotorGL/src/pykotor
 ```
 
-Install the frontend dependencies in your Python environment:
+Install the frontend dependencies:
 
 ```bash
 python -m pip install -r requirements.txt
@@ -41,15 +42,14 @@ python run.py --backend-info
 python run.py
 ```
 
-`--backend-info` reports and checks the selected library paths without starting
-the GUI. Dependency wheels and backend source are supplied separately.
+`--backend-info` validates the configured library paths without starting the GUI.
 
 ## Native executable builds
 
-The build follows HoloPatcher's fresh-PyInstaller pipeline. It uses the
-`fresh-pyinstaller` action stored in your PyInstaller fork, validates its
-`FRESH_PYINSTALLER_MANIFEST` against every native bootloader, and keeps UPX
-disabled. Installing an upstream PyInstaller wheel is not part of this setup.
+Native builds uses a fresh-PyInstaller pipeline. The
+`fresh-pyinstaller` action in the configured PyInstaller repository compiles
+native bootloaders and produces `FRESH_PYINSTALLER_MANIFEST`. Builds validate
+every native bootloader against that manifest. UPX is disabled.
 PyInstaller 6.x is required; CI uses Python 3.12.
 
 | Platform | Distribution |
@@ -59,51 +59,26 @@ PyInstaller 6.x is required; CI uses Python 3.12.
 | macOS Intel | Onedir `.app.zip` |
 | macOS Apple Silicon | Onedir `.app.zip` |
 
-### GitHub Actions
-
-Run **Build optimized distributions with fresh PyInstaller** manually, or push
-an existing release tag matching `v*`. The workflow resolves the backend and
-PyInstaller refs to commits once, then uses those commits on every platform.
-It uploads build artifacts and provenance; it does not publish a GitHub release.
-
-The repository variables match HoloPatcher's setup:
-
-| Variable | Default / purpose |
-| --- | --- |
-| `PYKOTOR_REPOSITORY` | `<repository-owner>/PyKotor` |
-| `PYKOTOR_REF` | Backend ref; the manual `pykotor_ref` input overrides it |
-| `PYINSTALLER_REPOSITORY` | `<repository-owner>/pyinstaller` |
-| `PYINSTALLER_REF` | Fork ref; the manual `pyinstaller_ref` input overrides it |
-| `SOURCE_READ_TOKEN` (optional secret) | Read access if either source repository is private |
-
-The selected fork must include `.github/actions/fresh-pyinstaller/action.yml`.
-The selected backend must include its compiler hook at
-`Libraries/PyKotor/src/pykotor/__pyinstaller/hook-pykotor.resource.formats.ncs.compiler.py`.
-This hook is required for source-checkout builds. The shared action compiles/installs
-PyInstaller in the job's clean Python environment and supplies
-`FRESH_PYINSTALLER_MANIFEST`. Its wheel and compilation manifest are also
-uploaded so that the same native build can be installed locally.
 
 ### Local Windows build
 
-Build on Windows with your backend checkout and the same Python environment
-that received your fork's PyInstaller build. Install application dependencies
-**before** running the fork's action/helper or installing its native wheel:
+Windows builds require a PyKotor checkout and a Python environment containing
+the custom PyInstaller build. Install application dependencies **before**
+running the fresh-PyInstaller helper or installing its native wheel:
 
 ```powershell
 python -m pip install -r requirements-build.txt
-# Run the fork's fresh-pyinstaller helper, or install the wheel it produced.
+# Run the fresh-pyinstaller helper or install the resulting native wheel.
 $env:FRESH_PYINSTALLER_MANIFEST = "C:\build-tools\fresh-pyinstaller.json"
 .\build_windows.ps1 -PyKotorRoot "C:\src\PyKotor"
 ```
 
-Use the actual manifest path emitted by your fork. The helper produces
-`dist/HolocronToolset.exe` and checks its embedded payload, compiler and startup.
-The previous Windows OneDir mode is replaced by the single-file policy.
+Set the manifest path to the file produced by the PyInstaller build. The helper
+produces `dist/HolocronToolset.exe` and checks its embedded payload, compiler and startup.
 
 ### Local release packages
 
-With the same fork build installed, its manifest selected, and
+With the custom PyInstaller build installed, its manifest configured, and
 `HOLOCRON_PYKOTOR_ROOT` set, run the matching native target:
 
 ```bash
@@ -115,14 +90,14 @@ python build/build_distributions.py --target macos-arm64
 
 Each command runs on its target OS/architecture. Use an empty `release/`
 directory. Output includes the distribution, SHA-256 checksums, dependency
-versions, the fork manifest, and frontend/backend Git commits when available.
+versions, the PyInstaller manifest, and frontend/backend Git commits when available.
 Source archives record `null` for unavailable Git commits.
 
 Linux needs a compiler, zlib headers, `patchelf`, `desktop-file-validate`, and
 Qt/OpenGL/XCB libraries; the workflow installs these and runs under Xvfb.
 AppImage assembly uses the two URL/hash pins in `build/appimage-tools.json`.
 macOS uses ad-hoc signing with the selected deployment target; these builds
-are not notarized. No credentials for release signing are assumed.
+are not notarized. Release signing credentials are not configured.
 
 Packaging checks run the executable outside the source tree with invalid
 backend environment paths, compile/analyze a script for K1 and K2, verify help,
@@ -150,7 +125,7 @@ Regenerate UI/resource modules with PyQt5 installed:
 python src/ui/convertui.py
 ```
 
-Run the retained tests with the selected backend and development dependencies:
+Run the tests with the configured PyKotor checkout and development dependencies:
 
 ```bash
 python -m pip install -r requirements-dev.txt
@@ -167,8 +142,8 @@ application imports them directly.
 `src/toolset/data/instance_history.py` implements undo/redo for KotOR Game
 Instance Table (GIT) records, shared by the GIT editor and Module Designer.
 
-Automatic startup/help updates are disabled. The retained manual application
+Automatic startup/help updates are disabled. Manual application
 and help update actions still refer to the upstream project; use a release
-source that matches this frontend and backend before relying on those actions.
+source compatible with the installed Toolset and PyKotor versions.
 
 See `LICENSE` for licensing.
