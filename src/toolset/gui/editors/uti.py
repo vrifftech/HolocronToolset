@@ -341,12 +341,12 @@ class PropertyEditor(QDialog):
                 self.ui.parameterList.addItem(item)
 
         upgrades = installation.htGetCache2DA(HTInstallation.TwoDA_UPGRADES)
-        self.ui.upgradeSelect.addItem("[None]", None)
+        self.ui.upgradeSelect.addItem("[Not specified]", None)
+        self.ui.upgradeSelect.addItem("[No upgrade required]", 0xFF)
         for i in range(upgrades.get_height()):
             text = upgrades.get_cell(i, "label").replace("_" , " ").title()
             self.ui.upgradeSelect.addItem(text, i)
-        if utiProperty.upgrade_type is not None:
-            self.ui.upgradeSelect.setCurrentIndex(utiProperty.upgrade_type + 1)
+        self.ui.upgradeSelect.setCurrentIndex(self.ui.upgradeSelect.findData(utiProperty.upgrade_type))
 
         self.reloadTextboxes()
 
@@ -379,7 +379,5 @@ class PropertyEditor(QDialog):
         self.reloadTextboxes()
 
     def utiProperty(self) -> UTIProperty:
-        self._utiProperty.upgrade_type = self.ui.upgradeSelect.currentIndex() - 1
-        if self.ui.upgradeSelect.currentIndex() == 0:
-            self._utiProperty.upgrade_type = None
+        self._utiProperty.upgrade_type = self.ui.upgradeSelect.currentData()
         return self._utiProperty
