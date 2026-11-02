@@ -34,7 +34,7 @@
           </widget>
          </item>
          <item>
-          <widget class="RobustTreeView" name="coreTree">
+          <widget class="QTreeView" name="coreTree">
            <property name="editTriggers">
             <set>QAbstractItemView::NoEditTriggers</set>
            </property>
@@ -70,7 +70,7 @@
           </widget>
          </item>
          <item>
-          <widget class="RobustTreeView" name="modulesTree">
+          <widget class="QTreeView" name="modulesTree">
            <property name="editTriggers">
             <set>QAbstractItemView::NoEditTriggers</set>
            </property>
@@ -106,7 +106,7 @@
           </widget>
          </item>
          <item>
-          <widget class="RobustTreeView" name="overrideTree">
+          <widget class="QTreeView" name="overrideTree">
            <property name="editTriggers">
             <set>QAbstractItemView::NoEditTriggers</set>
            </property>
@@ -1244,7 +1244,7 @@
        </item>
        <item>
         <widget class="QTabWidget" name="tabWidget_3">
-         <widget class="QWidget" name="contentsTab">
+         <widget class="QWidget" name="tab_6">
           <attribute name="title">
            <string>Contents</string>
           </attribute>
@@ -1349,11 +1349,6 @@
   </layout>
  </widget>
  <customwidgets>
-  <customwidget>
-   <class>RobustTreeView</class>
-   <extends>QTreeView</extends>
-   <header location="global">utility.gui.qt.widgets.itemviews.treeview</header>
-  </customwidget>
   <customwidget>
    <class>DropFrame</class>
    <extends>QFrame</extends>

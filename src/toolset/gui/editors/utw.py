@@ -1,5 +1,3 @@
-"""UTW (waypoint) editor: locstring name and linked module waypoint."""
-
 from __future__ import annotations
 
 from copy import deepcopy
@@ -15,179 +13,95 @@ from toolset.gui.editor import Editor
 if TYPE_CHECKING:
     import os
 
-    from qtpy.QtWidgets import QWidget
-
-    from pykotor.common.language import LocalizedString
-    from pykotor.common.module import GFF
+    from PyQt5.QtWidgets import QWidget
     from toolset.data.installation import HTInstallation
 
 
 class UTWEditor(Editor):
-    def __init__(
-        self,
-        parent: QWidget | None,
-        installation: HTInstallation | None = None,
-    ):
-        """Initialize Waypoint Editor window.
-
-        Args:
-        ----
-            parent: {Parent widget}
-            installation: {Installation object}.
-
-        Processing Logic:
-        ----------------
-            - Initialize UI elements from designer file
-            - Set up menu bar and signal connections
-            - Load installation data if provided
-            - Initialize UTW object
-            - Create new empty waypoint by default.
-        """
+    def __init__(self, parent: QWidget | None, installation: HTInstallation | None = None):
+        """Initialize Waypoint Editor window."""
         supported: list[ResourceType] = [ResourceType.UTW]
         super().__init__(parent, "Waypoint Editor", "waypoint", supported, supported, installation)
 
-        from toolset.uic.qtpy.editors.utw import Ui_MainWindow
-
-        self.ui: Ui_MainWindow = Ui_MainWindow()
+        from toolset.uic.editors.utw import Ui_MainWindow
+        self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
-        self._setup_menus()
-        self._add_help_action()
-        self._setup_signals()
-        if installation is not None:
-            self._setup_installation(installation)
+        self._setupMenus()
+        self._setupSignals()
+        self._setupInstallation(installation)
 
-        self._utw: UTW = UTW()
+        self._utw = UTW()
 
         self.new()
 
-    def _nav_resource_types(self) -> list[ResourceType]:
-        return [ResourceType.UTW]
+    def _setupSignals(self):
+        self.ui.tagGenerateButton.clicked.connect(self.generateTag)
+        self.ui.resrefGenerateButton.clicked.connect(self.generateResref)
+        self.ui.noteChangeButton.clicked.connect(self.changeNote)
 
-    def _setup_signals(self):
-        for signal, handler in (
-            (self.ui.tagGenerateButton.clicked, self.generate_tag),
-            (self.ui.resrefGenerateButton.clicked, self.generate_resref),
-            (self.ui.noteChangeButton.clicked, self.change_note),
-        ):
-            signal.connect(handler)
-
-    def _setup_installation(self, installation: HTInstallation):
-        if not hasattr(self, "ui"):
-            return  # UI not initialized yet, will be set up in __init__
+    def _setupInstallation(self, installation: HTInstallation):
         self._installation = installation
-        self.ui.nameEdit.set_installation(installation)
+        self.ui.nameEdit.setInstallation(installation)
 
-    def _set_map_note_locstring(self, locstring: LocalizedString):
-        self._load_locstring(self.ui.noteEdit, locstring)
-
-    def _get_map_note_locstring(self) -> LocalizedString:
-        return self.ui.noteEdit.locstring()
-
-    def _load_basic_fields(self, utw: UTW):
-        self.ui.nameEdit.set_locstring(utw.name)
-        self.ui.tagEdit.setText(utw.tag)
-        self.ui.resrefEdit.setText(str(utw.resref))
-
-    def _save_basic_fields(self, utw: UTW):
-        utw.name = self.ui.nameEdit.locstring()
-        utw.tag = self.ui.tagEdit.text()
-        utw.resref = ResRef(self.ui.resrefEdit.text())
-
-    def load(
-        self,
-        filepath: os.PathLike | str,
-        resref: str,
-        restype: ResourceType,
-        data: bytes,
-    ):
-        """Load resource and populate UI from UTW. Defaults from construct_utw (K1 LoadWaypoint 0x005c7f30; TSL TODO)."""
+    def load(self, filepath: os.PathLike | str, resref: str, restype: ResourceType, data: bytes):
         super().load(filepath, resref, restype, data)
 
-        utw: UTW = read_utw(data)
+        utw = read_utw(data)
         self._loadUTW(utw)
 
     def _loadUTW(self, utw: UTW):
-        """Load UTW data into UI elements.
-
-        Args:
-        ----
-            utw (UTW): UTW object to load data from
-
-        Defaults from construct_utw; K1 LoadWaypoint 0x005c7f30; TSL same (addresses TODO). Sets name, tag, resref, map note, comment.
-        """
+        """Load UTW data into UI elements."""
         self._utw = utw
 
-        # Basic (Tag "", LocalizedName empty, TemplateResRef blank per K1)
-        self._load_basic_fields(utw)
+        # Basic
+        self.ui.nameEdit.setLocstring(utw.name)
+        self.ui.tagEdit.setText(utw.tag)
+        self.ui.resrefEdit.setText(str(utw.resref))
 
-        # Advanced (HasMapNote 0, MapNoteEnabled 0, MapNote empty per K1 LoadWaypoint)
+        # Advanced
         self.ui.isNoteCheckbox.setChecked(utw.has_map_note)
         self.ui.noteEnabledCheckbox.setChecked(utw.map_note_enabled)
-        self._set_map_note_locstring(utw.map_note)
+        self._loadLocstring(self.ui.noteEdit, utw.map_note)
 
-        # Comments (toolset-only; default "")
+        # Comments
         self.ui.commentsEdit.setPlainText(utw.comment)
 
     def build(self) -> tuple[bytes, bytes]:
-        """Builds a UTW from UI data.
-
-        Returns:
-        -------
-            tuple[bytes, bytes]: GFF data and log.
-
-        Populates UTW from UI, then dismantle_utw (K1 LoadWaypoint 0x005c7f30; TSL TODO). Returns GFF bytes and log.
-        """
+        """Builds a UTW object from UI controls."""
         utw: UTW = deepcopy(self._utw)
 
-        self._save_basic_fields(utw)
+        utw.name = self.ui.nameEdit.locstring()
+        utw.tag = self.ui.tagEdit.text()
+        if str(utw.resref) != self.ui.resrefEdit.text():
+            utw.resref = ResRef(self.ui.resrefEdit.text())
         utw.has_map_note = self.ui.isNoteCheckbox.isChecked()
         utw.map_note_enabled = self.ui.noteEnabledCheckbox.isChecked()
-        utw.map_note = self._get_map_note_locstring()
+        utw.map_note = self.ui.noteEdit.locstring
         utw.comment = self.ui.commentsEdit.toPlainText()
 
         data = bytearray()
-        gff: GFF = dismantle_utw(utw)
+        gff = dismantle_utw(utw)
         write_gff(gff, data)
 
-        return bytes(data), b""
+        return data, b""
 
     def new(self):
         super().new()
         self._loadUTW(UTW())
 
-    def _edit_locstring(self, current: LocalizedString, apply_func) -> None:
-        """Open a localized string dialog and apply result when accepted."""
-        assert self._installation is not None
-        dialog = LocalizedStringDialog(self, self._installation, current)
-        if dialog.exec():
-            apply_func(dialog.locstring)
 
-    def change_name(self):
-        self._edit_locstring(
-            self.ui.nameEdit.locstring(),
-            lambda locstring: self._load_locstring(self.ui.nameEdit.ui.locstringText, locstring),  # pyright: ignore[reportArgumentType]
-        )
+    def changeNote(self):
+        dialog = LocalizedStringDialog(self, self._installation, self.ui.noteEdit.locstring)
+        if dialog.exec_():
+            self._loadLocstring(self.ui.noteEdit, dialog.locstring)
 
-    def change_note(self):
-        self._edit_locstring(self._get_map_note_locstring(), self._set_map_note_locstring)
+    def generateTag(self):
+        if not self.ui.resrefEdit.text():
+            self.generateResref()
+        self.ui.tagEdit.setText(self.ui.resrefEdit.text())
 
-    def generate_tag(self):
-        resref_edit_text = self.ui.resrefEdit.text()
-        if not resref_edit_text or not resref_edit_text.strip():
-            self.generate_resref()
-            resref_edit_text = self.ui.resrefEdit.text()
-        self.ui.tagEdit.setText(resref_edit_text)
-
-    def generate_resref(self):
+    def generateResref(self):
         if self._resname:
             self.ui.resrefEdit.setText(self._resname)
         else:
             self.ui.resrefEdit.setText("m00xx_way_000")
-
-
-if __name__ == "__main__":
-    import sys
-
-    from toolset.gui.editors.standalone import launch_editor_cli
-
-    sys.exit(launch_editor_cli("utw"))

@@ -1,21 +1,13 @@
-"""Clone module dialog: copy a module (MOD/RIM) to a new name with optional overwrite."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, NamedTuple
 
-from qtpy import QtCore
-from qtpy.QtCore import Qt
-from qtpy.QtWidgets import QDialog, QMessageBox
-
 from pykotor.common.module import Module
 from pykotor.tools import module
-from toolset.gui.common.localization import translate as tr, trf
+from PyQt5.QtWidgets import QDialog, QMessageBox, QWidget
 from toolset.gui.dialogs.asyncloader import AsyncLoader
 
 if TYPE_CHECKING:
-    from qtpy.QtWidgets import QWidget
-
     from toolset.data.installation import HTInstallation
 
 _ROOT_INDEX = 0
@@ -56,36 +48,20 @@ class CloneModuleDialog(QDialog):
             - Loads available modules into the dropdown.
         """
         super().__init__(parent)
-        self.setWindowFlags(
-            QtCore.Qt.WindowFlags(
-                QtCore.Qt.WindowType.Dialog  # pyright: ignore[reportArgumentType]
-                | QtCore.Qt.WindowType.WindowCloseButtonHint,
-            )
-            & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint
-            & ~QtCore.Qt.WindowType.WindowMinMaxButtonsHint,
-        )
 
-        from toolset.uic.qtpy.dialogs.clone_module import Ui_Dialog
-
-        self.ui = Ui_Dialog()
+        from toolset.uic.dialogs import clone_module
+        self.ui = clone_module.Ui_Dialog()
         self.ui.setupUi(self)
-
-        # Setup event filter to prevent scroll wheel interaction with controls
-        from toolset.gui.common.filters import NoScrollEventFilter
-
-        self._no_scroll_filter = NoScrollEventFilter(self)
-        self._no_scroll_filter.setup_filter(parent_widget=self)
 
         self._active: HTInstallation = active
         self._installations: dict[str, HTInstallation] = {active.name: active}
 
         self.ui.createButton.clicked.connect(self.ok)
-        # QPushButton.clicked emits a bool; QDialog.close takes no args.
-        self.ui.cancelButton.clicked.connect(lambda *_: self.close())
-        self.ui.filenameEdit.textChanged.connect(self.set_prefix_from_filename)
-        self.ui.moduleSelect.currentIndexChanged.connect(self.changed_module)
+        self.ui.cancelButton.clicked.connect(self.close)  # type: ignore[]
+        self.ui.filenameEdit.textChanged.connect(self.setPrefixFromFilename)
+        self.ui.moduleSelect.currentIndexChanged.connect(self.changedModule)
 
-        self.load_modules()
+        self.loadModules()
 
     def ok(self):
         """Clones a module once user accepted the dialog query.
@@ -106,57 +82,37 @@ class CloneModuleDialog(QDialog):
             - Runs cloning asynchronously and displays status
             - Shows success message if clone completed.
         """
-        installation: HTInstallation = self.ui.moduleSelect.currentData().installation
-        root: str = self.ui.moduleSelect.currentData().root
-        identifier: str = self.ui.filenameEdit.text().lower()
-        prefix: str = self.ui.prefixEdit.text().lower()
-        name: str = self.ui.nameEdit.text()
+        installation = self.ui.moduleSelect.currentData().installation
+        root = self.ui.moduleSelect.currentData().root
+        identifier = self.ui.filenameEdit.text().lower()
+        prefix = self.ui.prefixEdit.text().lower()
+        name = self.ui.nameEdit.text()
 
-        copy_textures: bool = self.ui.copyTexturesCheckbox.isChecked()
-        copy_lightmaps: bool = self.ui.copyLightmapsCheckbox.isChecked()
-        keep_doors: bool = self.ui.keepDoorsCheckbox.isChecked()
-        keep_placeables: bool = self.ui.keepPlaceablesCheckbox.isChecked()
-        keep_sounds: bool = self.ui.keepSoundsCheckbox.isChecked()
-        keep_pathing: bool = self.ui.keepPathingCheckbox.isChecked()
+        copyTextures = self.ui.copyTexturesCheckbox.isChecked()
+        copyLightmaps = self.ui.copyLightmapsCheckbox.isChecked()
+        keepDoors = self.ui.keepDoorsCheckbox.isChecked()
+        keepPlaceables = self.ui.keepPlaceablesCheckbox.isChecked()
+        keepSounds = self.ui.keepSoundsCheckbox.isChecked()
+        keepPathing = self.ui.keepPathingCheckbox.isChecked()
 
         def task():
-            return module.clone_module(
-                root,
-                identifier,
-                prefix,
-                name,
-                installation,
-                copy_textures=copy_textures,
-                copy_lightmaps=copy_lightmaps,
-                keep_doors=keep_doors,
-                keep_placeables=keep_placeables,
-                keep_sounds=keep_sounds,
-                keep_pathing=keep_pathing,
-            )
+            return module.clone_module(root, identifier, prefix, name, installation,
+                                        copy_textures=copyTextures, copy_lightmaps=copyLightmaps,
+                                        keep_doors=keepDoors, keep_placeables=keepPlaceables, keep_sounds=keepSounds, keep_pathing=keepPathing)
 
-        if copy_textures:
-            QMessageBox(
-                QMessageBox.Icon.Information,
-                tr("This may take a while"),
-                tr(
-                    "You have selected to create copies of the texture. This process may add a few extra minutes to the waiting time."
-                ),
-                flags=Qt.WindowType.Window
-                | Qt.WindowType.Dialog
-                | Qt.WindowType.WindowStaysOnTopHint,
-            ).exec()
+        if copyTextures:
+            QMessageBox(QMessageBox.Information, "This may take a while", "You have selected to create copies of the "
+                        "texture. This process may add a few extra minutes to the waiting time.").exec_()
 
-        if not AsyncLoader(self, "Creating module", task, "Failed to create module").exec():
+        if not AsyncLoader(self, "Creating module", task, "Failed to create module").exec_():
             return
 
         QMessageBox(
-            QMessageBox.Icon.Information,
-            tr("Clone Successful"),
-            trf("You can now warp to the cloned module '{identifier}'.", identifier=identifier),
-            flags=Qt.WindowType.Window | Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint,
-        ).exec()
+            QMessageBox.Information,
+            "Clone Successful", f"You can now warp to the cloned module '{identifier}'."
+        ).exec_()
 
-    def load_modules(self):
+    def loadModules(self):
         """Loads module options from installed modules.
 
         Args:
@@ -174,7 +130,7 @@ class CloneModuleDialog(QDialog):
         options: dict[str, ModuleOption] = {}
         for installation in self._installations.values():
             for filename, name in installation.module_names().items():
-                root: str = Module.filepath_to_root(filename)
+                root = Module.find_root(filename)
                 if root not in options:
                     options[root] = ModuleOption(name, root, [], installation)
                 options[root].files.append(filename)
@@ -182,12 +138,9 @@ class CloneModuleDialog(QDialog):
         for option in options.values():
             self.ui.moduleSelect.addItem(option.name, option)
 
-    def changed_module(
-        self,
-        index: int,
-    ):
-        root: str = self.ui.moduleSelect.currentData().root
+    def changedModule(self, index: int):
+        root = self.ui.moduleSelect.currentData().root
         self.ui.moduleRootEdit.setText(root)
 
-    def set_prefix_from_filename(self):
+    def setPrefixFromFilename(self):
         self.ui.prefixEdit.setText(self.ui.filenameEdit.text().upper()[:3])

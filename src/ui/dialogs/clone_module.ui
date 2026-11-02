@@ -90,7 +90,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QComboBox" name="moduleSelect" />
+        <widget class="QComboBox" name="moduleSelect"/>
        </item>
        <item>
         <widget class="QLineEdit" name="moduleRootEdit">
@@ -142,7 +142,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="nameEdit" />
+        <widget class="QLineEdit" name="nameEdit"/>
        </item>
       </layout>
      </item>
@@ -199,6 +199,6 @@
    </item>
   </layout>
  </widget>
- <resources />
- <connections />
+ <resources/>
+ <connections/>
 </ui>

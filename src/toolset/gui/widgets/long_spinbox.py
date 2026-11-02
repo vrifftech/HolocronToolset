@@ -1,93 +1,74 @@
-"""Long spin box: QAbstractSpinBox for values beyond 32-bit signed range."""
-
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-import qtpy
-
-from qtpy.QtCore import Signal  # type: ignore[reportPrivateImportUsage]
-from qtpy.QtWidgets import QAbstractSpinBox
-
-if TYPE_CHECKING:
-    from qtpy.QtWidgets import QLineEdit, QWidget
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QAbstractSpinBox
 
 
-class LongSpinBox(QAbstractSpinBox):  # pyright: ignore[reportGeneralTypeIssues]
-    """Implementation of QAbstractSpinBox that allows for values that exceed a signed 32-bit integer."""
+class LongSpinBox(QAbstractSpinBox):
+    """Bounded integer editing, including signed and unsigned 64-bit values."""
 
-    sig_value_changed = Signal(object)  # type: ignore[reportPrivateImportUsage]
+    valueChanged = QtCore.pyqtSignal(object)
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent):
         super().__init__(parent)
-        self._min: int = 0
-        self._max: int = 0xFFFFFFFF
-
-        line_edit: QLineEdit | None = self.lineEdit()
-        if line_edit is None:
-            raise RuntimeError("Line edit is None somehow? This should be impossible.")
-        line_edit.editingFinished.connect(self.clamp_line_edit)
-        line_edit.textEdited.connect(lambda: self.sig_value_changed.emit(self.value()))
+        self._min = 0
+        self._max = 0xFFFFFFFF
+        self._value = 0
+        self.lineEdit().setText("0")
+        self.lineEdit().textEdited.connect(self._textEdited)
+        # Register before consumers so editingFinished observers see the committed value.
+        self.editingFinished.connect(self.clampLineEdit)
 
     def stepUp(self):
-        self.setValue(self.value() + 1)
+        self.stepBy(1)
 
     def stepDown(self):
-        self.setValue(self.value() - 1)
+        self.stepBy(-1)
 
     def stepBy(self, steps: int):
-        self.setValue(self.value() + steps * 1)
+        self.clampLineEdit()
+        self.setValue(self._value + steps)
 
     def text(self) -> str:
-        line_edit: QLineEdit | None = self.lineEdit()
-        if line_edit is None:
-            raise RuntimeError("Line edit is None somehow? This should be impossible.")
-        return str(line_edit.text())
+        return self.lineEdit().text()
 
     def setRange(self, min_value: int, max_value: int):
-        self._min = min_value
-        self._max = max_value
+        if min_value > max_value:
+            raise ValueError("The minimum cannot exceed the maximum.")
+        self._min, self._max = min_value, max_value
+        self.setValue(self._value)
 
-    def _within_range(self, value: int) -> bool:
-        return self._min <= value <= self._max
+    def _commitValue(self, value):
+        if value != self._value:
+            self._value = value
+            self.valueChanged.emit(value)
 
-    def clamp_line_edit(self):
-        line_edit: QLineEdit | None = self.lineEdit()
-        if line_edit is None:
-            raise RuntimeError("Line edit is None somehow? This should be impossible.")
+    def _textEdited(self, text):
         try:
-            value = int(line_edit.text())
-            value = max(self._min, min(self._max, value))
-            line_edit.setText(str(value))
+            value = int(text)
         except ValueError:
-            line_edit.setText("0")
+            return
+        if self._min <= value <= self._max:
+            self._commitValue(value)
+
+    def clampLineEdit(self):
+        try:
+            value = int(self.lineEdit().text())
+        except ValueError:
+            value = self._value
+        self.setValue(value)
 
     def setValue(self, value: int):
-        line_edit: QLineEdit | None = self.lineEdit()
-        if line_edit is None:
-            raise RuntimeError("Line edit is None somehow? This should be impossible.")
-        if not isinstance(value, int):
-            line_edit.setText("0")
-        else:
-            value = max(self._min, min(self._max, value))
-            line_edit.setText(str(value))
-        self.sig_value_changed.emit(self.value())
+        value = value if isinstance(value, int) else 0
+        value = max(self._min, min(self._max, value))
+        self.lineEdit().setText(str(value))
+        self._commitValue(value)
 
     def value(self) -> int:
-        line_edit: QLineEdit | None = self.lineEdit()
-        if line_edit is None:
-            raise RuntimeError("Line edit is None somehow? This should be impossible.")
-        try:
-            return int(line_edit.text())
-        except ValueError:
-            return 0
+        return self._value
 
-    def stepEnabled(self):
-        if hasattr(QAbstractSpinBox, "StepEnabledFlag"):
-            return (
-                QAbstractSpinBox.StepEnabledFlag.StepUpEnabled
-                | QAbstractSpinBox.StepEnabledFlag.StepDownEnabled
-            )
-        if qtpy.API_NAME == "PyQt5":
-            return self.StepUpEnabled | self.StepDownEnabled
-        return QAbstractSpinBox.StepUpEnabled | QAbstractSpinBox.StepDownEnabled
+    def stepEnabled(self) -> QAbstractSpinBox.StepEnabled:
+        flags = self.StepNone
+        if self._value < self._max:
+            flags |= self.StepUpEnabled
+        if self._value > self._min:
+            flags |= self.StepDownEnabled
+        return flags

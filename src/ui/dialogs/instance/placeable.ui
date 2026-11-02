@@ -6,132 +6,208 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>420</width>
-    <height>360</height>
+    <width>353</width>
+    <height>151</height>
    </rect>
   </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
   <property name="windowTitle">
-   <string>Placeable instance</string>
+   <string>Edit Placeable</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <layout class="QFormLayout" name="formLayout">
      <item row="0" column="0">
-      <widget class="QLabel" name="labelResref">
+      <widget class="QLabel" name="label">
        <property name="text">
-        <string>Template resref</string>
+        <string>ResRef:</string>
        </property>
       </widget>
      </item>
      <item row="0" column="1">
       <widget class="QLineEdit" name="resrefEdit">
+       <property name="maximumSize">
+        <size>
+         <width>187</width>
+         <height>16777215</height>
+        </size>
+       </property>
        <property name="maxLength">
         <number>16</number>
        </property>
       </widget>
      </item>
      <item row="1" column="0">
-      <widget class="QLabel" name="labelPos">
+      <widget class="QLabel" name="label_2">
        <property name="text">
-        <string>Position</string>
+        <string>Position:</string>
        </property>
       </widget>
      </item>
      <item row="1" column="1">
-      <layout class="QHBoxLayout" name="posLayout">
+      <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
         <widget class="QDoubleSpinBox" name="xPosSpin">
+         <property name="maximumSize">
+          <size>
+           <width>90</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="decimals">
+          <number>6</number>
+         </property>
          <property name="minimum">
           <double>-1000000.000000000000000</double>
          </property>
          <property name="maximum">
           <double>1000000.000000000000000</double>
-         </property>
-         <property name="decimals">
-          <number>4</number>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QDoubleSpinBox" name="yPosSpin">
+         <property name="maximumSize">
+          <size>
+           <width>90</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="decimals">
+          <number>6</number>
+         </property>
          <property name="minimum">
           <double>-1000000.000000000000000</double>
          </property>
          <property name="maximum">
           <double>1000000.000000000000000</double>
-         </property>
-         <property name="decimals">
-          <number>4</number>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QDoubleSpinBox" name="zPosSpin">
+         <property name="maximumSize">
+          <size>
+           <width>90</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="decimals">
+          <number>6</number>
+         </property>
          <property name="minimum">
           <double>-1000000.000000000000000</double>
          </property>
          <property name="maximum">
           <double>1000000.000000000000000</double>
-         </property>
-         <property name="decimals">
-          <number>4</number>
          </property>
         </widget>
        </item>
       </layout>
      </item>
      <item row="2" column="0">
-      <widget class="QLabel" name="labelBearing">
+      <widget class="QLabel" name="label_3">
        <property name="text">
-        <string>Bearing (rad)</string>
+        <string>Bearing:</string>
        </property>
       </widget>
      </item>
      <item row="2" column="1">
       <widget class="QDoubleSpinBox" name="bearingSpin">
-       <property name="minimum">
-        <double>-100.000000000000000</double>
-       </property>
-       <property name="maximum">
-        <double>100.000000000000000</double>
+       <property name="maximumSize">
+        <size>
+         <width>90</width>
+         <height>16777215</height>
+        </size>
        </property>
        <property name="decimals">
         <number>6</number>
        </property>
+       <property name="minimum">
+        <double>-1000000.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>1000000.000000000000000</double>
+       </property>
       </widget>
      </item>
      <item row="3" column="0">
-      <widget class="QLabel" name="labelTag">
+      <widget class="QLabel" name="label_4">
        <property name="text">
-        <string>Tag</string>
+        <string>Tweak Color:</string>
        </property>
       </widget>
      </item>
      <item row="3" column="1">
-      <widget class="QLineEdit" name="tagEdit"/>
-     </item>
-     <item row="4" column="0">
-      <widget class="QLabel" name="labelTweak">
-       <property name="text">
-        <string>Tweak color (BGR)</string>
-       </property>
-      </widget>
-     </item>
-     <item row="4" column="1">
-      <layout class="QHBoxLayout" name="tweakLayout">
+      <layout class="QHBoxLayout" name="horizontalLayout_9">
        <item>
-        <widget class="QCheckBox" name="useTweakColorCheck">
+        <widget class="QLabel" name="color">
+         <property name="minimumSize">
+          <size>
+           <width>16</width>
+           <height>16</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>16</width>
+           <height>16</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">background: black;</string>
+         </property>
          <property name="text">
-          <string>Enable</string>
+          <string/>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QSpinBox" name="tweakBgrSpin">
-         <property name="maximum">
-          <number>16777215</number>
+        <widget class="LongSpinBox" name="colorSpin">
+         <property name="minimumSize">
+          <size>
+           <width>90</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>90</width>
+           <height>16777215</height>
+          </size>
          </property>
         </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="colorButton">
+         <property name="maximumSize">
+          <size>
+           <width>24</width>
+           <height>20</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
        </item>
       </layout>
      </item>
@@ -149,6 +225,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>LongSpinBox</class>
+   <extends>QSpinBox</extends>
+   <header location="global">toolset.gui.widgets.long_spinbox</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections>
   <connection>
@@ -156,12 +239,32 @@
    <signal>accepted()</signal>
    <receiver>Dialog</receiver>
    <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>248</x>
+     <y>254</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>157</x>
+     <y>274</y>
+    </hint>
+   </hints>
   </connection>
   <connection>
    <sender>buttonBox</sender>
    <signal>rejected()</signal>
    <receiver>Dialog</receiver>
    <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>316</x>
+     <y>260</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>286</x>
+     <y>274</y>
+    </hint>
+   </hints>
   </connection>
  </connections>
 </ui>

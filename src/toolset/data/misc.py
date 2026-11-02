@@ -1,109 +1,36 @@
-"""Toolset data helpers: ControlItem (key/mouse bindings) and related types."""
-
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Set, Tuple, Union
+from typing import Optional, Set, Tuple
 
-from qtpy.QtCore import Qt
+from PyQt5.QtCore import Qt
 
-from loggerplus import RobustLogger
-from toolset.utils.misc import get_qt_button_string, get_qt_key_string
-
-if TYPE_CHECKING:
-    from qtpy.QtGui import QKeySequence
-
-Bind = Tuple[Set[Qt.Key], Union[Set[Qt.MouseButton], None]]
+Bind = Tuple[Optional[Set[int]], Optional[Set[int]]]
 
 
 class ControlItem:
-    def __init__(
-        self,
-        bind: Bind,
-    ):
-        self.keys: set[Qt.Key] = bind[0]
-        self.mouse: set[Qt.MouseButton] | None = bind[1]
+    def __init__(self, bind: Bind):
+        self.keys = None if bind[0] is None else set(bind[0])
+        self.mouse = None if bind[1] is None else set(bind[1])
 
-    def satisfied(
-        self,
-        buttons: set[Qt.MouseButton]
-        | set[int]
-        | set[Qt.MouseButton | int],  # Do NOT send None here!
-        keys: set[Qt.Key] | set[QKeySequence] | set[int] | set[Qt.Key | QKeySequence | int],
-        *,
-        exact_keys_and_buttons: bool = False,
-        debug_log: bool = False,
-    ) -> bool:
-        """Handles the key/mouse events, determine if the conditions are met.
-
-        Args:
-        ----
-            delta: The amount and direction of the scroll.
-            buttons: The set of buttons currently pressed.
-            keys: The set of keys currently pressed.
-
-        Returns:
-        -------
-            bool: Whether the input is satisfied.
-        """
-        no_buttons: bool = self.mouse is None
-        any_buttons: bool = self.mouse is not None and not self.mouse
-        any_keys: bool = not self.keys
-        if exact_keys_and_buttons:
-            mouse_equal: bool = self.mouse == buttons
-            mouse_satisfied: bool = no_buttons or any_buttons or mouse_equal
+    def satisfied(self, buttons: set[int], keys: set[int], *, exactKeys=True) -> bool:
+        mouse_matches = self.mouse is None or self.mouse == buttons
+        if self.keys is None:
+            keys_match = True
+        elif exactKeys or not self.keys:
+            keys_match = self.keys == keys
         else:
-            mouse_subset = True if self.mouse is None else self.mouse.issubset(buttons)
-            mouse_satisfied = no_buttons or any_buttons or mouse_subset
-
-        if exact_keys_and_buttons:
-            keys_equal: bool = self.keys == keys
-            keys_satisfied: bool = any_keys or keys_equal
-        else:
-            keys_subset: bool = self.keys.issubset(keys)
-            keys_satisfied = any_keys or keys_subset
-
-        if not debug_log:
-            return bool(mouse_satisfied and keys_satisfied)
-        needed_mouse: list[str] = (
-            [get_qt_button_string(btn) for btn in iter(self.mouse)]
-            if self.mouse is not None
-            else ["None"]
-        )
-        user_pressing_mouse: list[str] = [get_qt_button_string(btn) for btn in iter(buttons)]
-        needed_keys: list[str] = [get_qt_key_string(key) for key in iter(self.keys)]
-        user_pressing_keys: list[str] = [get_qt_key_string(key) for key in iter(keys)]
-
-        RobustLogger().debug(
-            f"Needed mouse: {needed_mouse}, user pressing {user_pressing_mouse}. Satisfied? {mouse_satisfied} no_buttons? {no_buttons} any_buttons? {any_buttons}",
-        )  # noqa: E501
-        RobustLogger().debug(
-            f"Needed keys: {needed_keys}, user pressing {user_pressing_keys} Satisfied? {keys_satisfied} any_keys? {any_keys} exactKeys? {exact_keys_and_buttons}",
-        )  # noqa: E501
-
-        return bool(mouse_satisfied and keys_satisfied)
+            keys_match = self.keys.issubset(keys)
+        return mouse_matches and keys_match
 
 
-class ControlGroup:
-    def __init__(
-        self,
-        *controls: ControlItem,
+
+def update_modifiers(keys: set[int], modifiers) -> None:
+    """Mouse events carry modifier state even when the key was pressed elsewhere."""
+    for flag, key in (
+        (Qt.ShiftModifier, Qt.Key_Shift), (Qt.ControlModifier, Qt.Key_Control),
+        (Qt.AltModifier, Qt.Key_Alt), (Qt.MetaModifier, Qt.Key_Meta),
     ):
-        self.controls: list[ControlItem] = list(controls)
-
-    def satisfied(
-        self,
-        buttons: set[Qt.MouseButton],  # Do NOT send None here!
-        keys: set[Qt.Key],
-        *,
-        exact_keys_and_buttons: bool = False,
-        debug_log: bool = False,
-    ) -> bool:
-        return any(
-            control.satisfied(
-                buttons,
-                keys,
-                exact_keys_and_buttons=exact_keys_and_buttons,
-                debug_log=debug_log,
-            )
-            for control in self.controls
-        )
+        if modifiers & flag:
+            keys.add(key)
+        else:
+            keys.discard(key)

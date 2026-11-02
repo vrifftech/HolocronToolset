@@ -1,56 +1,46 @@
-"""GIT camera instance editor."""
-
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-from qtpy.QtWidgets import QDialog
-
 from pykotor.resource.generics.git import GITCamera
-from utility.common.geometry import Vector4
-
-if TYPE_CHECKING:
-    from qtpy.QtWidgets import QWidget
+from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtWidgets import QDialog, QWidget
 
 
 class CameraDialog(QDialog):
-    def __init__(self, parent: QWidget | None, instance: GITCamera):
+    def __init__(self, parent: QWidget, camera: GITCamera):
         super().__init__(parent)
-        self._instance: GITCamera = instance
 
-        from toolset.uic.qtpy.dialogs.instance.camera import Ui_Dialog
+        from toolset.uic.dialogs.instance.camera import Ui_Dialog
 
-        self.ui: Ui_Dialog = Ui_Dialog()
+        self.ui = Ui_Dialog()
         self.ui.setupUi(self)
-        self._load_from_instance()
 
-    def _load_from_instance(self) -> None:
-        self.ui.xPosSpin.setValue(self._instance.position.x)
-        self.ui.yPosSpin.setValue(self._instance.position.y)
-        self.ui.zPosSpin.setValue(self._instance.position.z)
-        self.ui.cameraIdSpin.setValue(int(self._instance.camera_id))
-        self.ui.fovSpin.setValue(self._instance.fov)
-        self.ui.heightSpin.setValue(self._instance.height)
-        self.ui.micRangeSpin.setValue(self._instance.mic_range)
-        self.ui.pitchSpin.setValue(self._instance.pitch)
-        self.ui.oriXSpin.setValue(self._instance.orientation.x)
-        self.ui.oriYSpin.setValue(self._instance.orientation.y)
-        self.ui.oriZSpin.setValue(self._instance.orientation.z)
-        self.ui.oriWSpin.setValue(self._instance.orientation.w)
+        self.setWindowTitle("Edit Camera")
+        self.setWindowIcon(QIcon(QPixmap(":/images/icons/k1/camera.png")))
 
-    def accept(self) -> None:
-        self._instance.position.x = self.ui.xPosSpin.value()
-        self._instance.position.y = self.ui.yPosSpin.value()
-        self._instance.position.z = self.ui.zPosSpin.value()
-        self._instance.camera_id = int(self.ui.cameraIdSpin.value())
-        self._instance.fov = self.ui.fovSpin.value()
-        self._instance.height = self.ui.heightSpin.value()
-        self._instance.mic_range = self.ui.micRangeSpin.value()
-        self._instance.pitch = self.ui.pitchSpin.value()
-        self._instance.orientation = Vector4(
-            self.ui.oriXSpin.value(),
-            self.ui.oriYSpin.value(),
-            self.ui.oriZSpin.value(),
-            self.ui.oriWSpin.value(),
-        )
+        self.ui.xPosSpin.setValue(camera.position.x)
+        self.ui.yPosSpin.setValue(camera.position.y)
+        self.ui.zPosSpin.setValue(camera.position.z)
+        self.ui.xOrientSpin.setValue(camera.orientation.x)
+        self.ui.yOrientSpin.setValue(camera.orientation.y)
+        self.ui.zOrientSpin.setValue(camera.orientation.z)
+        self.ui.wOrientSpin.setValue(camera.orientation.w)
+        self.ui.cameraIdSpin.setValue(camera.camera_id)
+        self.ui.fovSpin.setValue(camera.fov)
+        self.ui.heightSpin.setValue(camera.height)
+        self.ui.micRangeSpin.setValue(camera.mic_range)
+        self.ui.pitchSpin.setValue(camera.pitch)
+
+        self.camera: GITCamera = camera
+
+    def accept(self):
         super().accept()
+        self.camera.position.x = self.ui.xPosSpin.value()
+        self.camera.position.y = self.ui.yPosSpin.value()
+        self.camera.position.z = self.ui.zPosSpin.value()
+        self.camera.orientation.x = self.ui.xOrientSpin.value()
+        self.camera.orientation.y = self.ui.yOrientSpin.value()
+        self.camera.orientation.z = self.ui.zOrientSpin.value()
+        self.camera.orientation.w = self.ui.wOrientSpin.value()
+        self.camera.camera_id = self.ui.cameraIdSpin.value()
+        self.camera.fov = self.ui.fovSpin.value()
+        self.camera.height = self.ui.heightSpin.value()
+        self.camera.mic_range = self.ui.micRangeSpin.value()
+        self.camera.pitch = self.ui.pitchSpin.value()

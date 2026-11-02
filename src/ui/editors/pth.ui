@@ -52,47 +52,18 @@
     <property name="title">
      <string>File</string>
     </property>
-    <addaction name="actionNew" />
-    <addaction name="actionOpen" />
-    <addaction name="actionSave" />
-    <addaction name="actionSaveAs" />
-    <addaction name="separator" />
-    <addaction name="actionLoadWalkmesh" />
-    <addaction name="separator" />
-    <addaction name="actionExit" />
+    <addaction name="actionNew"/>
+    <addaction name="actionOpen"/>
+    <addaction name="actionSave"/>
+    <addaction name="actionSaveAs"/>
+    <addaction name="separator"/>
+    <addaction name="actionLoadWalkmesh"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
    </widget>
-   <addaction name="menuFile" />
+   <addaction name="menuFile"/>
   </widget>
-  <widget class="QToolBar" name="mainToolBar">
-   <property name="windowTitle">
-    <string>Path Editor Tools</string>
-   </property>
-   <property name="movable">
-    <bool>true</bool>
-   </property>
-   <property name="floatable">
-    <bool>true</bool>
-   </property>
-   <attribute name="toolBarArea">
-    <enum>TopToolBarArea</enum>
-   </attribute>
-   <attribute name="toolBarBreak">
-    <bool>false</bool>
-   </attribute>
-   <addaction name="actionSelect" />
-   <addaction name="actionAddNode" />
-   <addaction name="actionConnect" />
-   <addaction name="separator" />
-   <addaction name="actionUndo" />
-   <addaction name="actionRedo" />
-   <addaction name="actionDelete" />
-   <addaction name="separator" />
-   <addaction name="actionToggleWalkmesh" />
-   <addaction name="actionShowRoomBoundaries" />
-   <addaction name="actionShowGrid" />
-   <addaction name="actionCenterCamera" />
-  </widget>
-  <widget class="QStatusBar" name="statusbar" />
+  <widget class="QStatusBar" name="statusbar"/>
   <action name="actionNew">
    <property name="text">
     <string>New</string>
@@ -123,83 +94,6 @@
     <string>Load Walkmesh</string>
    </property>
   </action>
-  <action name="actionSelect">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Select / Move</string>
-   </property>
-  </action>
-  <action name="actionAddNode">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Add Node</string>
-   </property>
-  </action>
-  <action name="actionConnect">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Connect Nodes</string>
-   </property>
-  </action>
-  <action name="actionUndo">
-   <property name="text">
-    <string>Undo</string>
-   </property>
-  </action>
-  <action name="actionRedo">
-   <property name="text">
-    <string>Redo</string>
-   </property>
-  </action>
-  <action name="actionDelete">
-   <property name="text">
-    <string>Delete</string>
-   </property>
-  </action>
-  <action name="actionToggleWalkmesh">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Show Walkmesh</string>
-   </property>
-  </action>
-  <action name="actionCenterCamera">
-   <property name="text">
-    <string>Center Camera</string>
-   </property>
-  </action>
-  <action name="actionShowRoomBoundaries">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Show Room Boundaries</string>
-   </property>
-  </action>
-  <action name="actionShowGrid">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Show Grid</string>
-   </property>
-  </action>
  </widget>
  <customwidgets>
   <customwidget>
@@ -209,6 +103,6 @@
    <container>1</container>
   </customwidget>
  </customwidgets>
- <resources />
- <connections />
+ <resources/>
+ <connections/>
 </ui>

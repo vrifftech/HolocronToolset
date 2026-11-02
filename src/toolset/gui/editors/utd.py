@@ -1,310 +1,95 @@
-"""UTD (door) editor: model, linked module, and dialog integration."""
-
 from __future__ import annotations
-
-import os
 
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
-from qtpy.QtWidgets import QComboBox, QLineEdit, QMessageBox, QPlainTextEdit, QWidget
-
-from loggerplus import RobustLogger  # type: ignore[import-untyped, note]
 from pykotor.common.misc import ResRef
 from pykotor.common.stream import BinaryWriter
-from pykotor.extract.installation import SearchLocation
 from pykotor.resource.formats.gff import write_gff
 from pykotor.resource.generics.dlg import DLG, dismantle_dlg
 from pykotor.resource.generics.utd import UTD, dismantle_utd, read_utd
 from pykotor.resource.type import ResourceType
 from pykotor.tools import door
+from PyQt5.QtWidgets import QMessageBox, QWidget
 from toolset.data.installation import HTInstallation
-from toolset.gui.common.localization import translate as tr
-from toolset.gui.dialogs.edit.locstring import LocalizedStringDialog
 from toolset.gui.editor import Editor
 from toolset.gui.widgets.settings.installations import GlobalSettings
-from toolset.utils.window import open_resource_editor
+from toolset.utils.window import openResourceEditor
 
 if TYPE_CHECKING:
-    from qtpy.QtWidgets import QWidget
-    from typing_extensions import Literal
+    import os
 
     from pykotor.extract.file import ResourceResult
-    from pykotor.resource.formats.twoda import TwoDA
-    from toolset.uic.qtpy.editors.utd import Ui_MainWindow
-    from utility.gui.qt.widgets.widgets.combobox import FilterComboBox
+    from pykotor.resource.formats.twoda.twoda_data import TwoDA
 
 
 class UTDEditor(Editor):
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        installation: HTInstallation | None = None,
-    ):
-        """Initialize the Door Editor.
-
-        Args:
-        ----
-            parent: {QWidget}: The parent widget.
-            installation: {HTInstallation}: The installation object.
-
-        Returns:
-        -------
-            None: Does not return anything.
-
-        Processing Logic:
-        ----------------
-            1. Get supported resource types and call parent initializer.
-            2. Initialize global settings object.
-            3. Get generic doors 2DA cache from installation.
-            4. Initialize UTD object.
-            5. Set up UI from designer file.
-            6. Set up menus, signals and installation.
-            7. Update 3D preview and call new() to initialize editor.
-        """
+    def __init__(self, parent: QWidget | None, installation: HTInstallation | None = None, *, mainwindow=None):
+        """Initialize the Door Editor."""
         supported: list[ResourceType] = [ResourceType.UTD]
-        self.global_settings: GlobalSettings = GlobalSettings()
-        self._genericdoors_2da: TwoDA | None = (
-            installation.ht_get_cache_2da("genericdoors") if installation is not None else None
-        )
+        super().__init__(parent, "Door Editor", "door", supported, supported, installation, mainwindow)
+
+        self.globalSettings: GlobalSettings = GlobalSettings()
+        self._genericdoors2DA: TwoDA = installation.htGetCache2DA("genericdoors")
         self._utd: UTD = UTD()
-        self.ui: Ui_MainWindow | None = None
-        super().__init__(parent, "Door Editor", "door", supported, supported, installation)
 
-        from toolset.uic.qtpy.editors.utd import Ui_MainWindow  # noqa: PLC0415
-
+        from toolset.uic.editors.utd import Ui_MainWindow
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
-
-        self._setup_menus()
-        self._add_help_action()
-        self._setup_signals()
-        if installation is not None:
-            self._setup_installation(installation)
-
-        # Initialize model info widget state (collapsed by default)
-        self.ui.modelInfoLabel.setVisible(False)
-        self.ui.modelInfoSummaryLabel.setVisible(True)
+        self._setupMenus()
+        self._setupSignals()
+        self._setupInstallation(installation)
 
         self.update3dPreview()
         self.new()
-        self.resize(654, 495)
 
-    def _nav_resource_types(self) -> list[ResourceType]:
-        return [ResourceType.UTD]
+    def _setupSignals(self):
+        """Connect GUI buttons and signals to methods."""
+        self.ui.tagGenerateButton.clicked.connect(self.generateTag)
+        self.ui.resrefGenerateButton.clicked.connect(self.generateResref)
+        self.ui.conversationModifyButton.clicked.connect(self.editConversation)
 
-    def _on_installation_changed(self, installation: HTInstallation | None) -> None:
-        if installation is None:
-            return
-        self._setup_installation(installation)
-        self.update3dPreview()
+        self.ui.appearanceSelect.currentIndexChanged.connect(self.update3dPreview)
+        self.ui.actionShowPreview.triggered.connect(self.togglePreview)
 
-    def _setup_signals(self):
-        """Connect GUI buttons and signals to methods.
-
-        Args:
-        ----
-            self: The class instance.
-
-        Processing Logic:
-        ----------------
-            - Connect tagGenerateButton click signal to generate_tag method
-            - Connect resrefGenerateButton click signal to generate_resref method
-            - Connect conversationModifyButton click signal to edit_conversation method
-            - Connect appearanceSelect currentIndexChanged signal to update3dPreview method
-            - Connect actionShowPreview triggered signal to toggle_preview method.
-        """
-        signal_connections = [
-            (self.ui.tagGenerateButton.clicked, self.generate_tag),
-            (self.ui.resrefGenerateButton.clicked, self.generate_resref),
-            (self.ui.conversationModifyButton.clicked, self.edit_conversation),
-            (self.ui.appearanceSelect.currentIndexChanged, self.update3dPreview),
-            (self.ui.actionShowPreview.triggered, self.toggle_preview),
-            (self.ui.modelInfoGroupBox.toggled, self._on_model_info_toggled),
-            (self.ui.previewRenderer.resourcesLoaded, self._on_textures_loaded),
-        ]
-        for signal, handler in signal_connections:
-            signal.connect(handler)
-
-    def _script_fields(self) -> list[FilterComboBox]:
-        """Return all script-related combo/text fields used by this editor."""
-        return [
-            self.ui.onClickEdit,
-            self.ui.onClosedEdit,
-            self.ui.onDamagedEdit,
-            self.ui.onDeathEdit,
-            self.ui.onHeartbeatSelect,
-            self.ui.onMeleeAttackEdit,
-            self.ui.onOpenEdit,
-            self.ui.onOpenFailedEdit,
-            self.ui.onSpellEdit,
-            self.ui.onUnlockEdit,
-            self.ui.onUserDefinedSelect,
-        ]
-
-    def _script_value_pairs(self, utd: UTD) -> list[tuple[FilterComboBox, ResRef]]:
-        """Map script widgets to UTD script values for load/populate operations."""
-        return [
-            (self.ui.onClickEdit, utd.on_click),
-            (self.ui.onClosedEdit, utd.on_closed),
-            (self.ui.onDamagedEdit, utd.on_damaged),
-            (self.ui.onDeathEdit, utd.on_death),
-            (self.ui.onOpenFailedEdit, utd.on_open_failed),
-            (self.ui.onHeartbeatSelect, utd.on_heartbeat),
-            (self.ui.onMeleeAttackEdit, utd.on_melee),
-            (self.ui.onSpellEdit, utd.on_power),
-            (self.ui.onOpenEdit, utd.on_open),
-            (self.ui.onUnlockEdit, utd.on_unlock),
-            (self.ui.onUserDefinedSelect, utd.on_user_defined),
-        ]
-
-    def _setup_reference_field(
-        self,
-        widget: QPlainTextEdit | QLineEdit | QComboBox,
-        resource_types: list[ResourceType],
-        reference_type: Literal[
-            "script", "tag", "template_resref", "conversation", "resref", "quest"
-        ]
-        | None,
-        tooltip_text: str,
-        *,
-        set_max_length: bool = False,
-    ) -> None:
-        """Configure context menu reference search behavior for a widget."""
-        assert self._installation is not None, (
-            "Installation must be set up before configuring reference fields."
-        )
-        self._installation.setup_file_context_menu(
-            widget,
-            resource_types,
-            enable_reference_search=True,
-            reference_search_type=reference_type,
-        )
-        widget.setToolTip(tr(tooltip_text))
-
-        if set_max_length and isinstance(widget, QComboBox):
-            line_edit = widget.lineEdit()
-            if line_edit is not None:
-                line_edit.setMaxLength(16)
-
-    def _setup_installation(self, installation: HTInstallation):
-        """Sets up the installation for editing.
-
-        Args:
-        ----
-            installation: {HTInstallation}: The installation to set up for editing.
-
-        Processing Logic:
-        ----------------
-            - Sets the internal installation reference and updates UI elements
-            - Loads required 2da files if not already loaded
-            - Populates appearance and faction dropdowns from loaded 2da files
-            - Shows/hides TSL-specific UI elements based on installation type.
-        """
-        if self.ui is None:
-            return  # UI not initialized yet, will be set up in __init__
+    def _setupInstallation(self, installation: HTInstallation):
+        """Sets up the installation for editing."""
         self._installation = installation
-        self.ui.nameEdit.set_installation(installation)
+        self.ui.nameEdit.setInstallation(installation)
         self.ui.previewRenderer.installation = installation
 
         # Load required 2da files if they have not been loaded already
         required: list[str] = [HTInstallation.TwoDA_DOORS, HTInstallation.TwoDA_FACTIONS]
-        installation.ht_batch_cache_2da(required)
+        installation.htBatchCache2DA(required)
 
-        appearances: TwoDA | None = installation.ht_get_cache_2da(HTInstallation.TwoDA_DOORS)
-        factions: TwoDA | None = installation.ht_get_cache_2da(HTInstallation.TwoDA_FACTIONS)
+        appearances: TwoDA = installation.htGetCache2DA(HTInstallation.TwoDA_DOORS)
+        factions: TwoDA = installation.htGetCache2DA(HTInstallation.TwoDA_FACTIONS)
 
-        self.ui.appearanceSelect.set_context(
-            appearances, self._installation, HTInstallation.TwoDA_DOORS
-        )
-        self.ui.factionSelect.set_context(
-            factions, self._installation, HTInstallation.TwoDA_FACTIONS
-        )
+        self.ui.appearanceSelect.setItems(appearances.get_column("label"))
+        self.ui.factionSelect.setItems(factions.get_column("label"))
 
-        if appearances is not None:
-            self.ui.appearanceSelect.set_items(appearances.get_column("label"))
-        if factions is not None:
-            self.ui.factionSelect.set_items(factions.get_column("label"))
+        self.ui.notBlastableCheckbox.setVisible(installation.tsl)
+        self.ui.difficultyModSpin.setVisible(installation.tsl)
+        self.ui.difficultySpin.setVisible(installation.tsl)
+        self.ui.difficultyLabel.setVisible(installation.tsl)
+        self.ui.difficultyModLabel.setVisible(installation.tsl)
 
-        self.handle_widget_with_tsl(self.ui.notBlastableCheckbox, installation)
-        self.handle_widget_with_tsl(self.ui.difficultyModSpin, installation)
-        self.handle_widget_with_tsl(self.ui.difficultySpin, installation)
-        self.handle_widget_with_tsl(self.ui.difficultyLabel, installation)
-        self.handle_widget_with_tsl(self.ui.difficultyModLabel, installation)
-
-        # Setup context menus for script fields with reference search enabled
-        for field in self._script_fields():
-            self._setup_reference_field(
-                field,
-                [ResourceType.NSS, ResourceType.NCS],
-                "script",
-                "Right-click to find references to this script in the installation.",
-                set_max_length=True,
-            )
-
-        self._setup_reference_field(
-            self.ui.conversationEdit,
-            [ResourceType.DLG],
-            "conversation",
-            "Right-click to find references to this conversation in the installation.",
-            set_max_length=True,
-        )
-        self._setup_reference_field(
-            self.ui.tagEdit,
-            [],
-            "tag",
-            "Right-click to find references to this tag in the installation.",
-        )
-        self._setup_reference_field(
-            self.ui.resrefEdit,
-            [],
-            "template_resref",
-            "Right-click to find references to this template resref in the installation.",
-        )
-
-    def handle_widget_with_tsl(
-        self,
-        widget: QWidget,
-        installation: HTInstallation,
-    ):
-        widget.setEnabled(installation.tsl)
-        if not installation.tsl:
-            from toolset.gui.common.localization import translate as tr  # noqa: PLC0415
-
-            widget.setToolTip(tr("This widget is only available in KOTOR II."))
-
-    def load(
-        self,
-        filepath: os.PathLike | str,
-        resref: str,
-        restype: ResourceType,
-        data: bytes | bytearray,
-    ) -> None:
-        """Load UTD from bytes."""
+    def load(self, filepath: os.PathLike | str, resref: str, restype: ResourceType, data: bytes):
         super().load(filepath, resref, restype, data)
 
         utd = read_utd(data)
         self._loadUTD(utd)
 
-    def _loadUTD(  # noqa: PLR0915
-        self,
-        utd: UTD,
-    ):
-        """Loads UTD data into UI elements.
-
-        Args:
-        ----
-            utd (UTD): UTD object to load data from
-        """
-        assert self._installation is not None
+    def _loadUTD(self, utd: UTD):
+        """Loads UTD data into UI elements."""
         self._utd = utd
 
         # Basic
-        self.ui.nameEdit.set_locstring(utd.name)
+        self.ui.nameEdit.setLocstring(utd.name)
         self.ui.tagEdit.setText(utd.tag)
         self.ui.resrefEdit.setText(str(utd.resref))
         self.ui.appearanceSelect.setCurrentIndex(utd.appearance_id)
-        self.ui.conversationEdit.set_combo_box_text(str(utd.conversation))
+        self.ui.conversationEdit.setText(str(utd.conversation))
 
         # Advanced
         self.ui.min1HpCheckbox.setChecked(utd.min1_hp)
@@ -313,7 +98,7 @@ class UTDEditor(Editor):
         self.ui.notBlastableCheckbox.setChecked(utd.not_blastable)
         self.ui.factionSelect.setCurrentIndex(utd.faction_id)
         self.ui.animationState.setValue(utd.animation_state)
-        self.ui.currentHpSpin.setValue(utd.current_hp)
+        self.ui.currenHpSpin.setValue(utd.current_hp)
         self.ui.maxHpSpin.setValue(utd.maximum_hp)
         self.ui.hardnessSpin.setValue(utd.hardness)
         self.ui.fortitudeSpin.setValue(utd.fortitude)
@@ -330,47 +115,33 @@ class UTDEditor(Editor):
         self.ui.difficultyModSpin.setValue(utd.unlock_diff_mod)
 
         # Scripts
-        for field, value in self._script_value_pairs(utd):
-            field.set_combo_box_text(str(value))
-
-        self.relevant_script_resnames: list[str] = sorted(
-            iter(
-                {
-                    res.resname().lower()
-                    for res in self._installation.get_relevant_resources(
-                        ResourceType.NCS, self._filepath
-                    )
-                }
-            )
-        )
-        for field in self._script_fields():
-            field.populate_combo_box(self.relevant_script_resnames)
-        self.ui.conversationEdit.populate_combo_box(
-            sorted(
-                iter(
-                    {
-                        res.resname().lower()
-                        for res in self._installation.get_relevant_resources(
-                            ResourceType.DLG, self._filepath
-                        )
-                    }
-                )
-            ),
-        )  # noqa: E501
+        self.ui.onClickEdit.setText(str(utd.on_click))
+        self.ui.onClosedEdit.setText(str(utd.on_closed))
+        self.ui.onDamagedEdit.setText(str(utd.on_damaged))
+        self.ui.onDeathEdit.setText(str(utd.on_death))
+        self.ui.onOpenFailedEdit.setText(str(utd.on_open_failed))
+        self.ui.onHeartbeatEdit.setText(str(utd.on_heartbeat))
+        self.ui.onMeleeAttackEdit.setText(str(utd.on_melee))
+        self.ui.onSpellEdit.setText(str(utd.on_power))
+        self.ui.onOpenEdit.setText(str(utd.on_open))
+        self.ui.onUnlockEdit.setText(str(utd.on_unlock))
+        self.ui.onUserDefinedEdit.setText(str(utd.on_user_defined))
 
         # Comments
         self.ui.commentsEdit.setPlainText(utd.comment)
 
-    def build(self) -> tuple[bytes | bytearray, bytes]:
-        """Build UTD bytes from editor state. Write values match engine (Tag, LocName, TemplateResRef, lock/key, HP, scripts, GenericType, Static, etc.). K1 LoadDoor @ 0x0058a1f0, TSL @ 0x00765620. Returns GFF bytes and log."""
+    def build(self) -> tuple[bytes, bytes]:
+        """Builds a UTD object from UI data."""
         utd: UTD = deepcopy(self._utd)
 
         # Basic
         utd.name = self.ui.nameEdit.locstring()
         utd.tag = self.ui.tagEdit.text()
-        utd.resref = ResRef(self.ui.resrefEdit.text())
+        if str(utd.resref) != self.ui.resrefEdit.text():
+            utd.resref = ResRef(self.ui.resrefEdit.text())
         utd.appearance_id = self.ui.appearanceSelect.currentIndex()
-        utd.conversation = ResRef(self.ui.conversationEdit.currentText())
+        if str(utd.conversation) != self.ui.conversationEdit.text():
+            utd.conversation = ResRef(self.ui.conversationEdit.text())
 
         # Advanced
         utd.min1_hp = self.ui.min1HpCheckbox.isChecked()
@@ -379,7 +150,7 @@ class UTDEditor(Editor):
         utd.not_blastable = self.ui.notBlastableCheckbox.isChecked()
         utd.faction_id = self.ui.factionSelect.currentIndex()
         utd.animation_state = self.ui.animationState.value()
-        utd.current_hp = self.ui.currentHpSpin.value()
+        utd.current_hp = self.ui.currenHpSpin.value()
         utd.maximum_hp = self.ui.maxHpSpin.value()
         utd.hardness = self.ui.hardnessSpin.value()
         utd.fortitude = self.ui.fortitudeSpin.value()
@@ -396,20 +167,28 @@ class UTDEditor(Editor):
         utd.key_name = self.ui.keyEdit.text()
 
         # Scripts
-        for attr_name, field in (
-            ("on_click", self.ui.onClickEdit),
-            ("on_closed", self.ui.onClosedEdit),
-            ("on_damaged", self.ui.onDamagedEdit),
-            ("on_death", self.ui.onDeathEdit),
-            ("on_open_failed", self.ui.onOpenFailedEdit),
-            ("on_heartbeat", self.ui.onHeartbeatSelect),
-            ("on_melee", self.ui.onMeleeAttackEdit),
-            ("on_power", self.ui.onSpellEdit),
-            ("on_open", self.ui.onOpenEdit),
-            ("on_unlock", self.ui.onUnlockEdit),
-            ("on_user_defined", self.ui.onUserDefinedSelect),
-        ):
-            setattr(utd, attr_name, ResRef(field.currentText()))
+        if str(utd.on_click) != self.ui.onClickEdit.text():
+            utd.on_click = ResRef(self.ui.onClickEdit.text())
+        if str(utd.on_closed) != self.ui.onClosedEdit.text():
+            utd.on_closed = ResRef(self.ui.onClosedEdit.text())
+        if str(utd.on_damaged) != self.ui.onDamagedEdit.text():
+            utd.on_damaged = ResRef(self.ui.onDamagedEdit.text())
+        if str(utd.on_death) != self.ui.onDeathEdit.text():
+            utd.on_death = ResRef(self.ui.onDeathEdit.text())
+        if str(utd.on_open_failed) != self.ui.onOpenFailedEdit.text():
+            utd.on_open_failed = ResRef(self.ui.onOpenFailedEdit.text())
+        if str(utd.on_heartbeat) != self.ui.onHeartbeatEdit.text():
+            utd.on_heartbeat = ResRef(self.ui.onHeartbeatEdit.text())
+        if str(utd.on_melee) != self.ui.onMeleeAttackEdit.text():
+            utd.on_melee = ResRef(self.ui.onMeleeAttackEdit.text())
+        if str(utd.on_power) != self.ui.onSpellEdit.text():
+            utd.on_power = ResRef(self.ui.onSpellEdit.text())
+        if str(utd.on_open) != self.ui.onOpenEdit.text():
+            utd.on_open = ResRef(self.ui.onOpenEdit.text())
+        if str(utd.on_unlock) != self.ui.onUnlockEdit.text():
+            utd.on_unlock = ResRef(self.ui.onUnlockEdit.text())
+        if str(utd.on_user_defined) != self.ui.onUserDefinedEdit.text():
+            utd.on_user_defined = ResRef(self.ui.onUserDefinedEdit.text())
 
         # Comments
         utd.comment = self.ui.commentsEdit.toPlainText()
@@ -424,56 +203,34 @@ class UTDEditor(Editor):
         super().new()
         self._loadUTD(UTD())
 
-    def change_name(self):
-        assert self._installation is not None
-        dialog = LocalizedStringDialog(self, self._installation, self.ui.nameEdit.locstring())
-        if dialog.exec():
-            self._load_locstring(self.ui.nameEdit.ui.locstringText, dialog.locstring)
 
-    def generate_tag(self):
-        if not self.ui.resrefEdit.text():
-            self.generate_resref()
+    def generateTag(self):
+        if self.ui.resrefEdit.text() == "":
+            self.generateResref()
         self.ui.tagEdit.setText(self.ui.resrefEdit.text())
 
-    def generate_resref(self):
-        if self._resname:
+    def generateResref(self):
+        if self._resname is not None and self._resname != "":
             self.ui.resrefEdit.setText(self._resname)
         else:
             self.ui.resrefEdit.setText("m00xx_dor_000")
 
-    def edit_conversation(self):
-        """Edits a conversation.
+    def editConversation(self):
+        """Edits a conversation."""
+        resname = self.ui.conversationEdit.text()
+        data, filepath = None, None
 
-        Processing Logic:
-        ----------------
-            1. Gets the conversation name from the UI text field
-            2. Searches the installation for the conversation resource
-            3. If not found, prompts to create a new file in the override folder
-            4. If found or created, opens the resource editor window.
-        """
-        assert self._installation is not None
-        resname: str = self.ui.conversationEdit.currentText()
-        data: bytes | bytearray | None = None
-        filepath: os.PathLike | None = None
-
-        if not resname or not resname.strip():
-            QMessageBox(
-                QMessageBox.Icon.Critical,
-                "Failed to open DLG Editor",
-                "Conversation field cannot be blank.",
-            ).exec()
+        if resname == "":
+            QMessageBox(QMessageBox.Critical, "Failed to open DLG Editor", "Conversation field cannot be blank.").exec_()
             return
 
-        search: ResourceResult | None = self._installation.resource(resname, ResourceType.DLG)
+        search = self._installation.resource(resname, ResourceType.DLG)
 
         if search is None:
-            msgbox = QMessageBox(
-                QMessageBox.Icon.Information,
-                "DLG file not found",
-                "Do you wish to create a file in the override?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            ).exec()
-            if msgbox == QMessageBox.StandardButton.Yes:
+            msgbox = QMessageBox(QMessageBox.Information, "DLG file not found",
+                                 "Do you wish to create a file in the override?",
+                                 QMessageBox.Yes | QMessageBox.No).exec_()
+            if QMessageBox.Yes == msgbox:
                 data = bytearray()
 
                 write_gff(dismantle_dlg(DLG()), data)
@@ -482,316 +239,34 @@ class UTDEditor(Editor):
                 writer.write_bytes(data)
                 writer.close()
         else:
-            resname, filepath, data = search.resname, search.filepath, search.data
+            resname, restype, filepath, data = search
 
         if data is not None:
-            open_resource_editor(
-                filepath, resname, ResourceType.DLG, data, self._installation, self
-            )
+            openResourceEditor(filepath, resname, ResourceType.DLG, data, self._installation, self)
 
-    def toggle_preview(self):
-        self.global_settings.showPreviewUTP = not self.global_settings.showPreviewUTP
+    def togglePreview(self):
+        self.globalSettings.showPreviewUTP = not self.globalSettings.showPreviewUTP
         self.update3dPreview()
 
     def update3dPreview(self):
-        """Updates the 3D preview renderer visibility and size.
+        """Updates the 3D preview renderer visibility and size."""
+        self.ui.previewRenderer.setVisible(self.globalSettings.showPreviewUTP)
+        self.ui.actionShowPreview.setChecked(self.globalSettings.showPreviewUTP)
 
-        Processing Logic:
-        ----------------
-            - Checks if the global setting for showing preview is True
-            - If True, calls _update_model() to update the 3D model preview
-            - If False, hides BOTH the preview renderer AND the model info groupbox.
-        """
-        if self.ui is None:
-            return
-        show_preview = self.global_settings.showPreviewUTP
-        self.ui.previewRenderer.setVisible(show_preview)
-        self.ui.modelInfoGroupBox.setVisible(show_preview)
-        self.ui.actionShowPreview.setChecked(show_preview)
-
-        try:
-            if show_preview:
-                self._update_model()
-            else:
-                self.resize(max(374, self.sizeHint().width()), max(457, self.sizeHint().height()))
-        except Exception:  # noqa: BLE001, S110
-            # Silently handle any errors in preview update to prevent pytest-qt from reporting them
-            # Errors are already handled in _update_model, but we catch here for signal handlers
-            pass
+        if self.globalSettings.showPreviewUTP:
+            self._update_model()
+        else:
+            self.setFixedSize(374, 457)
 
     def _update_model(self):
-        """Updates the model preview.
-
-        Processing Logic:
-        ----------------
-            - Build the model data from the installation data
-            - Get the model name based on the data and installation details
-            - Load the MDL and MDX resources using the model name
-            - If resources are loaded, set them on the preview renderer
-            - If not loaded, clear the existing model from the preview renderer
-            - Update the model info label with resource location details
-            - Do DIRECT texture lookups using Installation (not async scene tracking)
-        """
-        assert self._installation is not None
-        self.resize(max(674, self.sizeHint().width()), max(457, self.sizeHint().height()))
+        """Updates the model preview."""
+        self.setFixedSize(674, 457)
 
         data, _ = self.build()
-        utd = read_utd(data)
-
-        # Build model information text - focus on low-level technical details
-        info_lines: list[str] = []
-
-        # Validate appearance_id before calling door.get_model() to prevent IndexError
-        if self._genericdoors_2da is None:
-            self.ui.previewRenderer.clear_model()
-            info_lines.append("❌ genericdoors.2da not loaded")
-            self.ui.modelInfoLabel.setText("\n".join(info_lines))
-            return
-
-        # Check if appearance_id is within valid range
-        if utd.appearance_id < 0 or utd.appearance_id >= self._genericdoors_2da.get_height():
-            self.ui.previewRenderer.clear_model()
-            info_lines.append("❌ Invalid appearance ID")
-            info_lines.append(f"Range: 0-{self._genericdoors_2da.get_height() - 1}")
-            self.ui.modelInfoLabel.setText("\n".join(info_lines))
-            return
-
-        try:
-            modelname: str = door.get_model(
-                utd, self._installation, genericdoors=self._genericdoors_2da
-            )
-        except (IndexError, ValueError) as e:
-            # Fallback: Invalid appearance_id or missing genericdoors.2da - clear the model
-            self.ui.previewRenderer.clear_model()
-            info_lines.append(f"❌ Lookup error: {e}")
-            try:
-                row = self._genericdoors_2da.get_row(utd.appearance_id)
-                if row.has_string("modelname"):
-                    modelname_col = row.get_string("modelname")
-                    if not modelname_col or modelname_col.strip() == "****":
-                        modelname_col = "[empty]"
-                else:
-                    modelname_col = "[column missing]"
-                info_lines.append(
-                    f"genericdoors.2da row {utd.appearance_id}: 'modelname' = '{modelname_col}'"
-                )
-            except (IndexError, KeyError):
-                pass
-            self.ui.modelInfoLabel.setText("\n".join(info_lines))
-            return
-
-        # Show the lookup process
-        info_lines.append(f"Model resolved: '{modelname}'")
-        try:
-            row = self._genericdoors_2da.get_row(utd.appearance_id)
-            info_lines.append(f"Lookup: genericdoors.2da[row {utd.appearance_id}]['modelname']")
-        except (IndexError, KeyError):
-            pass
-
-        # Use same search order as renderer for consistency
-        model_search_order: list[SearchLocation] = [
-            SearchLocation.OVERRIDE,
-            SearchLocation.MODULES,
-            SearchLocation.CHITIN,
-        ]
-        mdl: ResourceResult | None = self._installation.resource(
-            modelname, ResourceType.MDL, model_search_order
-        )
-        mdx: ResourceResult | None = self._installation.resource(
-            modelname, ResourceType.MDX, model_search_order
-        )
-
+        modelname: str = door.get_model(read_utd(data), self._installation, genericdoors=self._genericdoors2DA)
+        mdl: ResourceResult | None = self._installation.resource(modelname, ResourceType.MDL)
+        mdx: ResourceResult | None = self._installation.resource(modelname, ResourceType.MDX)
         if mdl is not None and mdx is not None:
-            self.ui.previewRenderer.set_model(mdl.data, mdx.data)
-
-            # Show full file paths and source locations
-            try:
-                mdl_rel_path = mdl.filepath.relative_to(self._installation.path())
-                info_lines.append(f"MDL: {mdl_rel_path}")
-            except ValueError:
-                info_lines.append(f"MDL: {mdl.filepath}")
-
-            mdl_source = self._get_source_location_type(mdl.filepath)
-            if mdl_source:
-                info_lines.append(f"  └─ Source: {mdl_source}")
-
-            try:
-                mdx_rel_path = mdx.filepath.relative_to(self._installation.path())
-                info_lines.append(f"MDX: {mdx_rel_path}")
-            except ValueError:
-                info_lines.append(f"MDX: {mdx.filepath}")
-
-            mdx_source = self._get_source_location_type(mdx.filepath)
-            if mdx_source:
-                info_lines.append(f"  └─ Source: {mdx_source}")
-
-            # Show placeholder for textures - actual info will be populated when textures finish loading
-            info_lines.append("")
-            info_lines.append("Textures: Loading...")
+            self.ui.previewRenderer.setModel(mdl.data, mdx.data)
         else:
-            self.ui.previewRenderer.clear_model()
-            info_lines.append("❌ Resources not found in installation:")
-            search_order_str = self._format_search_order(model_search_order)
-            if mdl is None:
-                info_lines.append(f"  Missing: {modelname}.mdl")
-                info_lines.append(f"  (Searched: {search_order_str})")
-            if mdx is None:
-                info_lines.append(f"  Missing: {modelname}.mdx")
-                info_lines.append(f"  (Searched: {search_order_str})")
-
-        full_text = "\n".join(info_lines)
-        self.ui.modelInfoLabel.setText(full_text)
-
-        # Update summary (first line or key info)
-        summary = info_lines[0] if info_lines else "No model information"
-        if len(info_lines) > 1 and mdl is not None and mdx is not None:
-            # Show model name and source in summary
-            try:
-                mdl_rel = (
-                    os.path.relpath(mdl.filepath, self._installation.path())
-                    if self._installation
-                    else str(mdl.filepath)
-                )
-                summary = f"{modelname} -> {mdl_rel}"
-            except (ValueError, AttributeError):
-                summary = f"{modelname} -> {mdl.filepath}"
-        self.ui.modelInfoSummaryLabel.setText(summary)
-
-    def _format_search_order(self, search_order: list[SearchLocation]) -> str:
-        """Format search order list into human-readable string."""
-        location_names = {
-            SearchLocation.OVERRIDE: "Override",
-            SearchLocation.CUSTOM_MODULES: "Custom Modules",
-            SearchLocation.MODULES: "Modules",
-            SearchLocation.CHITIN: "Chitin BIFs",
-            SearchLocation.TEXTURES_TPA: "Texture Pack A",
-            SearchLocation.TEXTURES_TPB: "Texture Pack B",
-            SearchLocation.TEXTURES_TPC: "Texture Pack C",
-            SearchLocation.TEXTURES_GUI: "GUI Textures",
-        }
-        return " -> ".join(location_names.get(loc, str(loc)) for loc in search_order)
-
-    def _on_textures_loaded(self):
-        """Called when renderer signals that textures have finished loading.
-
-        Reads the EXACT lookup info from scene.texture_lookup_info - this is the
-        SAME info that the renderer used when loading textures. No additional lookups.
-        """
-        scene = self.ui.previewRenderer.scene
-        if scene is None:
-            return
-
-        # Get the EXACT lookup info stored by the renderer when it loaded textures
-        texture_lookup_info = getattr(scene, "texture_lookup_info", {})
-
-        if not texture_lookup_info:
-            RobustLogger().debug("_on_textures_loaded: No texture_lookup_info available yet")
-            return
-
-        RobustLogger().debug(
-            f"_on_textures_loaded: Found {len(texture_lookup_info)} textures with lookup info"
-        )
-
-        # Get current model info text and update the texture section
-        current_text = self.ui.modelInfoLabel.text()
-
-        # Find and replace the "Textures: Loading..." line
-        lines = current_text.split("\n")
-        new_lines: list[str] = []
-        skip_old_texture_section = False
-
-        for line in lines:
-            if "Textures:" in line:
-                skip_old_texture_section = True
-                # Add new texture section
-                new_lines.append("")
-                new_lines.append(f"Textures ({len(texture_lookup_info)} loaded by renderer):")
-
-                for tex_name, lookup_info in sorted(texture_lookup_info.items()):
-                    if lookup_info.get("found"):
-                        filepath = lookup_info.get("filepath")
-                        if filepath:
-                            try:
-                                if self._installation:
-                                    rel_path = os.path.relpath(filepath, self._installation.path())
-                                else:
-                                    rel_path = str(filepath)
-                                new_lines.append(f"  {tex_name}: {rel_path}")
-                            except (ValueError, AttributeError):
-                                new_lines.append(f"  {tex_name}: {filepath}")
-
-                            source = self._get_source_location_type(filepath)
-                            if source:
-                                new_lines.append(f"    └─ Source: {source}")
-                        else:
-                            new_lines.append(f"  {tex_name}: ✓ Loaded")
-                    else:
-                        search_order = lookup_info.get("search_order", [])
-                        search_str = (
-                            self._format_search_order(search_order) if search_order else "Unknown"
-                        )
-                        new_lines.append(f"  {tex_name}: ❌ Not found")
-                        new_lines.append(f"    └─ Searched: {search_str}")
-            elif skip_old_texture_section and line.startswith("  "):
-                # Skip old texture lines (indented)
-                continue
-            elif skip_old_texture_section and not line.startswith("  ") and line.strip():
-                # End of old texture section
-                skip_old_texture_section = False
-                new_lines.append(line)
-            elif not skip_old_texture_section:
-                new_lines.append(line)
-
-        self.ui.modelInfoLabel.setText("\n".join(new_lines))
-
-    def _on_model_info_toggled(self, checked: bool):
-        """Handle model info groupbox toggle."""
-        self.ui.modelInfoLabel.setVisible(checked)
-        if not checked:
-            # When collapsed, ensure summary is visible
-            self.ui.modelInfoSummaryLabel.setVisible(True)
-
-    def _get_source_location_type(self, filepath: os.PathLike | str) -> str | None:
-        """Determines the source location type for a given filepath.
-
-        Args:
-        ----
-            filepath: The filepath to analyze
-
-        Returns:
-        -------
-            A string describing the source location type, or None if unknown
-        """
-        if self._installation is None:
-            return None
-
-        try:
-            from pathlib import Path
-
-            path = self._installation.path()
-            filepath_obj = Path(filepath) if not isinstance(filepath, Path) else filepath
-            rel_path = filepath_obj.relative_to(path)
-            path_str = str(rel_path).lower().replace("\\", "/")
-            if "override" in path_str:
-                return "Override folder"
-            if path_str.startswith("modules/"):
-                if path_str.endswith(".mod"):
-                    return "Module (.mod)"
-                if path_str.endswith(".rim"):
-                    return "Module (.rim)"
-                return "Module"
-            if "chitin.key" in path_str or "data" in path_str:
-                return "Chitin BIFs"
-            if "textures" in path_str:
-                return "Texture pack"
-        except (ValueError, AttributeError):
-            pass
-        return None
-
-
-if __name__ == "__main__":
-    import sys
-
-    from toolset.gui.editors.standalone import launch_editor_cli
-
-    sys.exit(launch_editor_cli("utd"))
+            self.ui.previewRenderer.clearModel()

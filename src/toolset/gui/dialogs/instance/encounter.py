@@ -1,44 +1,31 @@
-"""GIT encounter instance editor (template + origin only; geometry uses editor modes)."""
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-from qtpy.QtWidgets import QDialog, QMessageBox
-
+from pykotor.common.misc import ResRef
 from pykotor.resource.generics.git import GITEncounter
-from toolset.gui.common.localization import translate as tr
-from toolset.gui.dialogs.instance._util import parse_resref_field
-
-if TYPE_CHECKING:
-    from qtpy.QtWidgets import QWidget
+from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtWidgets import QDialog, QWidget
 
 
 class EncounterDialog(QDialog):
-    def __init__(self, parent: QWidget | None, instance: GITEncounter):
+    def __init__(self, parent: QWidget, encounter: GITEncounter):
         super().__init__(parent)
-        self._instance: GITEncounter = instance
 
-        from toolset.uic.qtpy.dialogs.instance.encounter import Ui_Dialog
-
-        self.ui: Ui_Dialog = Ui_Dialog()
+        from toolset.uic.dialogs.instance.encounter import Ui_Dialog
+        self.ui = Ui_Dialog()
         self.ui.setupUi(self)
-        self._load_from_instance()
 
-    def _load_from_instance(self) -> None:
-        self.ui.resrefEdit.setText(str(self._instance.resref))
-        self.ui.xPosSpin.setValue(self._instance.position.x)
-        self.ui.yPosSpin.setValue(self._instance.position.y)
-        self.ui.zPosSpin.setValue(self._instance.position.z)
+        self.setWindowTitle("Edit Encounter")
+        self.setWindowIcon(QIcon(QPixmap(":/images/icons/k1/encounter.png")))
 
-    def accept(self) -> None:
-        resref, err = parse_resref_field(self.ui.resrefEdit.text())
-        if err:
-            QMessageBox.critical(self, tr("Invalid resref"), err)
-            return
-        assert resref is not None
-        self._instance.resref = resref
-        self._instance.position.x = self.ui.xPosSpin.value()
-        self._instance.position.y = self.ui.yPosSpin.value()
-        self._instance.position.z = self.ui.zPosSpin.value()
+        self.ui.resrefEdit.setText(str(encounter.resref))
+        self.ui.xPosSpin.setValue(encounter.position.x)
+        self.ui.yPosSpin.setValue(encounter.position.y)
+        self.ui.zPosSpin.setValue(encounter.position.z)
+
+        self.encounter: GITEncounter = encounter
+
+    def accept(self):
         super().accept()
+        self.encounter.resref = ResRef(self.ui.resrefEdit.text())
+        self.encounter.position.x = self.ui.xPosSpin.value()
+        self.encounter.position.y = self.ui.yPosSpin.value()
+        self.encounter.position.z = self.ui.zPosSpin.value()

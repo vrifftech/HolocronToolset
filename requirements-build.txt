@@ -1,0 +1,7 @@
+# Install before running the fresh-pyinstaller fork action/helper.
+# PyInstaller itself must come from that build, not a package-index wheel.
+-r requirements.txt
+setuptools>=68
+wheel
+packaging>=23
+tomli>=2,<3; python_version < "3.11"

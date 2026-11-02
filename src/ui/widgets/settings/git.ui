@@ -23,9 +23,9 @@
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>-195</y>
+        <y>0</y>
         <width>429</width>
-        <height>948</height>
+        <height>920</height>
        </rect>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout">
@@ -60,120 +60,103 @@
            </layout>
           </item>
           <item>
-           <widget class="QWidget" name="widget" native="true">
-            <property name="minimumSize">
-             <size>
-              <width>0</width>
-              <height>200</height>
-             </size>
+           <layout class="QFormLayout" name="formLayout">
+            <property name="verticalSpacing">
+             <number>10</number>
             </property>
-            <layout class="QFormLayout" name="formLayout">
-             <property name="verticalSpacing">
-              <number>10</number>
-             </property>
-             <item row="0" column="0">
-              <widget class="QLabel" name="label">
-               <property name="text">
-                <string>Move Camera:</string>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="1">
-              <widget class="SetBindWidget" name="moveCameraBindEdit" native="true"/>
-             </item>
-             <item row="1" column="0">
-              <widget class="QLabel" name="label_2">
-               <property name="text">
-                <string>Rotate Camera:</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="1">
-              <widget class="SetBindWidget" name="rotateCameraBindEdit" native="true"/>
-             </item>
-             <item row="2" column="0">
-              <widget class="QLabel" name="label_3">
-               <property name="text">
-                <string>Zoom Camera:</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="1">
-              <widget class="SetBindWidget" name="zoomCameraBindEdit" native="true"/>
-             </item>
-             <item row="3" column="0">
-              <widget class="QLabel" name="label_5">
-               <property name="text">
-                <string>Select Object:</string>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="1">
-              <widget class="SetBindWidget" name="selectUnderneathBindEdit" native="true"/>
-             </item>
-             <item row="4" column="0">
-              <widget class="QLabel" name="label_4">
-               <property name="text">
-                <string>Rotate Object:</string>
-               </property>
-              </widget>
-             </item>
-             <item row="4" column="1">
-              <widget class="SetBindWidget" name="rotateSelectedToPointBindEdit" native="true"/>
-             </item>
-             <item row="5" column="0">
-              <widget class="QLabel" name="label_6">
-               <property name="text">
-                <string>Delete Object:</string>
-               </property>
-              </widget>
-             </item>
-             <item row="5" column="1">
-              <widget class="SetBindWidget" name="deleteSelectedBindEdit" native="true"/>
-             </item>
-             <item row="6" column="0">
-              <widget class="QLabel" name="label_7">
-               <property name="text">
-                <string>Duplicate Object:</string>
-               </property>
-              </widget>
-             </item>
-             <item row="6" column="1">
-              <widget class="SetBindWidget" name="duplicateSelectedBindEdit" native="true"/>
-             </item>
-             <item row="7" column="0">
-              <widget class="QLabel" name="label_8">
-               <property name="text">
-                <string>Toggle Instance Lock:</string>
-               </property>
-              </widget>
-             </item>
-             <item row="7" column="1">
-              <widget class="SetBindWidget" name="toggleLockInstancesBindEdit" native="true"/>
-             </item>
-            </layout>
-           </widget>
+            <item row="0" column="0">
+             <widget class="QLabel" name="label">
+              <property name="text">
+               <string>Move Camera:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="SetBindWidget" name="moveCameraBindEdit" native="true"/>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="label_2">
+              <property name="text">
+               <string>Rotate Camera:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="SetBindWidget" name="rotateCameraBindEdit" native="true"/>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="label_3">
+              <property name="text">
+               <string>Zoom Camera:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="SetBindWidget" name="zoomCameraBindEdit" native="true"/>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="label_5">
+              <property name="text">
+               <string>Select Object:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="SetBindWidget" name="selectUnderneathBindEdit" native="true"/>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="label_4">
+              <property name="text">
+               <string>Rotate Object:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <widget class="SetBindWidget" name="rotateSelectedToPointBindEdit" native="true"/>
+            </item>
+            <item row="5" column="0">
+             <widget class="QLabel" name="label_6">
+              <property name="text">
+               <string>Delete Object:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="1">
+             <widget class="SetBindWidget" name="deleteSelectedBindEdit" native="true"/>
+            </item>
+            <item row="6" column="0">
+             <widget class="QLabel" name="label_7">
+              <property name="text">
+               <string>Duplicate Object:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="1">
+             <widget class="SetBindWidget" name="duplicateSelectedBindEdit" native="true"/>
+            </item>
+            <item row="7" column="0">
+             <widget class="QLabel" name="label_8">
+              <property name="text">
+               <string>Toggle Instance Lock:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="7" column="1">
+             <widget class="SetBindWidget" name="toggleLockInstancesBindEdit" native="true"/>
+            </item>
+           </layout>
           </item>
          </layout>
         </widget>
        </item>
        <item>
         <widget class="QGroupBox" name="groupBox_2">
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>660</height>
-          </size>
-         </property>
          <property name="title">
           <string>Walkmesh Colours</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
           <item row="1" column="0">
            <layout class="QFormLayout" name="formLayout_2">
-            <property name="sizeConstraint">
-             <enum>QLayout::SetMinimumSize</enum>
-            </property>
             <property name="verticalSpacing">
              <number>10</number>
             </property>
@@ -186,18 +169,6 @@
             </item>
             <item row="0" column="1">
              <widget class="ColorEdit" name="undefinedMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="1" column="0">
@@ -335,306 +306,78 @@
             </item>
             <item row="1" column="1">
              <widget class="ColorEdit" name="dirtMaterialColourEdit" native="true">
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="2" column="1">
              <widget class="ColorEdit" name="obscuringMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="3" column="1">
              <widget class="ColorEdit" name="grassMaterialColourEdit" native="true">
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="4" column="1">
              <widget class="ColorEdit" name="stoneMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>16777215</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="5" column="1">
              <widget class="ColorEdit" name="woodMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>16777215</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="6" column="1">
              <widget class="ColorEdit" name="waterMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>16777215</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="7" column="1">
              <widget class="ColorEdit" name="nonWalkMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="8" column="1">
              <widget class="ColorEdit" name="transparentMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>16777215</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="9" column="1">
              <widget class="ColorEdit" name="carpetMaterialColourEdit" native="true">
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="10" column="1">
              <widget class="ColorEdit" name="metalMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="11" column="1">
              <widget class="ColorEdit" name="puddlesMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>16777215</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="12" column="1">
              <widget class="ColorEdit" name="swampMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>16777215</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="13" column="1">
              <widget class="ColorEdit" name="mudMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="14" column="1">
              <widget class="ColorEdit" name="leavesMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="15" column="1">
              <widget class="ColorEdit" name="lavaMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="16" column="1">
              <widget class="ColorEdit" name="bottomlessPitMaterialColourEdit" native="true">
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="17" column="1">
              <widget class="ColorEdit" name="deepWaterMaterialColourEdit" native="true">
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="18" column="1">
              <widget class="ColorEdit" name="doorMaterialColourEdit" native="true">
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
             <item row="19" column="1">
              <widget class="ColorEdit" name="nonWalkGrassMaterialColourEdit" native="true">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-                <horstretch>0</horstretch>
-                <verstretch>1</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="minimumSize">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
              </widget>
             </item>
            </layout>
@@ -682,7 +425,7 @@
   <customwidget>
    <class>ColorEdit</class>
    <extends>QWidget</extends>
-   <header location="global">toolset.gui.widgets.edit.color</header>
+   <header location="global">toolset.gui.widgets.color_edit</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

@@ -1,54 +1,28 @@
-"""UTS (sound) editor: sound list, 3D position, and audio preview."""
-
 from __future__ import annotations
 
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
-from qtpy import QtCore
-from qtpy.QtCore import QBuffer
-from qtpy.QtMultimedia import QMediaPlayer
-from qtpy.QtWidgets import QListWidgetItem, QMessageBox
-
 from pykotor.common.misc import ResRef
 from pykotor.resource.formats.gff import write_gff
 from pykotor.resource.generics.uts import UTS, dismantle_uts, read_uts
 from pykotor.resource.type import ResourceType
-from toolset.gui.dialogs.edit.locstring import LocalizedStringDialog
+from PyQt5 import QtCore
+from PyQt5.QtCore import QBuffer, QIODevice
+from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
+from PyQt5.QtWidgets import QListWidgetItem, QMessageBox, QWidget
 from toolset.gui.editor import Editor
 
 if TYPE_CHECKING:
     import os
 
-    from qtpy.QtGui import QCloseEvent
-    from qtpy.QtWidgets import QWidget
-
-    from pykotor.resource.formats.gff.gff_data import GFF
+    from PyQt5.QtGui import QCloseEvent
     from toolset.data.installation import HTInstallation
 
 
 class UTSEditor(Editor):
-    def __init__(
-        self,
-        parent: QWidget | None,
-        installation: HTInstallation | None = None,
-    ):
-        """Initialize the Sound Editor window.
-
-        Args:
-        ----
-            parent: {QWidget}: The parent widget of this window
-            installation: {HTInstallation}: The installation object
-
-        Processing Logic:
-        ----------------
-            - Initialize supported resource types
-            - Initialize the superclass with window details
-            - Initialize UTS object
-            - Initialize media player and buffer
-            - Load UI from designer file
-            - Set up menus, signals and installation.
-        """
+    def __init__(self, parent: QWidget | None, installation: HTInstallation | None = None):
+        """Initialize the Sound Editor window."""
         supported: list[ResourceType] = [ResourceType.UTS]
         super().__init__(parent, "Sound Editor", "sound", supported, supported, installation)
 
@@ -57,103 +31,67 @@ class UTSEditor(Editor):
         self.player = QMediaPlayer(self)
         self.buffer = QBuffer(self)
 
-        from toolset.uic.qtpy.editors.uts import Ui_MainWindow
+        from toolset.uic.editors.uts import Ui_MainWindow
 
-        self.ui: Ui_MainWindow = Ui_MainWindow()
+        self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
-        self._setup_menus()
-        self._add_help_action()
-        self._setup_signals()
-        if installation is not None:
-            self._setup_installation(installation)
+        self._setupMenus()
+        self._setupSignals()
+        self._setupInstallation(installation)
 
         self.new()
 
-    def _nav_resource_types(self) -> list[ResourceType]:
-        return [ResourceType.UTS]
+    def _setupSignals(self):
+        """Sets up signal connections for UI buttons and radio buttons."""
+        self.ui.addSoundButton.clicked.connect(self.addSound)
+        self.ui.removeSoundButton.clicked.connect(self.removeSound)
+        self.ui.playSoundButton.clicked.connect(self.playSound)
+        self.ui.stopSoundButton.clicked.connect(self.player.stop)
+        self.ui.moveUpButton.clicked.connect(self.moveSoundUp)
+        self.ui.moveDownButton.clicked.connect(self.moveSoundDown)
 
-    def _setup_signals(self):
-        """Sets up signal connections for UI buttons and radio buttons.
+        self.ui.tagGenerateButton.clicked.connect(self.generateTag)
+        self.ui.resrefGenerateButton.clicked.connect(self.generateResref)
 
-        Processing Logic:
-        ----------------
-            - Connects addSoundButton click signal to addSound method
-            - Connects removeSoundButton click signal to removeSound method
-            - Connects playSoundButton click signal to play_sound method
-            - Connects stopSoundButton click signal to player stop method
-            - Connects moveUpButton and moveDownButton click signals to moveSoundUp and moveSoundDown methods
-            - Connects tagGenerateButton and resrefGenerateButton click signals to generate_tag and generate_resref methods
-            - Connects style radio buttons toggled signals to changeStyle method
-            - Connects play random/specific/everywhere radio buttons toggled signals to changePlay method.
-        """
-        for signal, handler in [
-            (self.ui.addSoundButton.clicked, self.add_sound),
-            (self.ui.removeSoundButton.clicked, self.remove_sound),
-            (self.ui.playSoundButton.clicked, self.play_sound),
-            (self.ui.stopSoundButton.clicked, self.player.stop),
-            (self.ui.moveUpButton.clicked, self.move_sound_up),
-            (self.ui.moveDownButton.clicked, self.move_sound_down),
-            (self.ui.tagGenerateButton.clicked, self.generate_tag),
-            (self.ui.resrefGenerateButton.clicked, self.generate_resref),
-        ]:
-            signal.connect(handler)
+        self.ui.styleOnceRadio.toggled.connect(self.changeStyle)
+        self.ui.styleSeamlessRadio.toggled.connect(self.changeStyle)
+        self.ui.styleRepeatRadio.toggled.connect(self.changeStyle)
 
-        for signal in (
-            self.ui.styleOnceRadio.toggled,
-            self.ui.styleSeamlessRadio.toggled,
-            self.ui.styleRepeatRadio.toggled,
-        ):
-            signal.connect(self.change_style)
+        self.ui.playRandomRadio.toggled.connect(self.changePlay)
+        self.ui.playSpecificRadio.toggled.connect(self.changePlay)
+        self.ui.playEverywhereRadio.toggled.connect(self.changePlay)
 
-        for signal in (
-            self.ui.playRandomRadio.toggled,
-            self.ui.playSpecificRadio.toggled,
-            self.ui.playEverywhereRadio.toggled,
-        ):
-            signal.connect(self.change_play)
-
-    def _setup_installation(self, installation: HTInstallation):
-        if not hasattr(self, "ui"):
-            return  # UI not initialized yet, will be set up in __init__
+    def _setupInstallation(self, installation: HTInstallation):
         self._installation = installation
-        self.ui.nameEdit.set_installation(installation)
+        self.ui.nameEdit.setInstallation(installation)
 
-    def load(
-        self,
-        filepath: os.PathLike | str,
-        resref: str,
-        restype: ResourceType,
-        data: bytes,
-    ):
-        """Load resource and populate UI from UTS. Defaults from construct_uts."""
+    def load(self, filepath: os.PathLike | str, resref: str, restype: ResourceType, data: bytes):
         super().load(filepath, resref, restype, data)
 
         uts: UTS = read_uts(data)
         self._loadUTS(uts)
 
-    def _loadUTS(
-        self,
-        uts: UTS,
-    ):
-        """Loads UTS data into UI controls.
-
-        Args:
-        ----
-            uts (UTS): UTS object to load
-
-        Defaults from construct_uts; K1 LoadSounds 0x00505560, TSL 0x0071c730 (Aspyr). Sets basic, playback, positioning, sounds list, comment.
-        """
+    def _loadUTS(self, uts: UTS):
+        """Loads UTS data into UI controls."""
         self._uts = uts
 
         # Basic
-        self.ui.nameEdit.set_locstring(uts.name)
+        self.ui.nameEdit.setLocstring(uts.name)
         self.ui.tagEdit.setText(uts.tag)
         self.ui.resrefEdit.setText(str(uts.resref))
         self.ui.volumeSlider.setValue(uts.volume)
         self.ui.activeCheckbox.setChecked(uts.active)
 
         # Advanced
-        self._apply_play_mode_from_uts(uts)
+        self.ui.playRandomRadio.setChecked(False)
+        self.ui.playSpecificRadio.setChecked(False)
+        self.ui.playEverywhereRadio.setChecked(False)
+        if uts.random_range_x != 0 and uts.random_range_y != 0:
+            self.ui.playRandomRadio.setChecked(True)
+        elif uts.positional:
+            self.ui.playSpecificRadio.setChecked(True)
+        else:
+            self.ui.playEverywhereRadio.setChecked(True)
 
         self.ui.orderSequentialRadio.setChecked(uts.random_pick == 0)
         self.ui.orderRandomRadio.setChecked(uts.random_pick == 1)
@@ -167,14 +105,23 @@ class UTSEditor(Editor):
         self.ui.soundList.clear()
         for sound in uts.sounds:
             item = QListWidgetItem(str(sound))
-            item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsEditable)
+            item.setData(QtCore.Qt.UserRole, sound)
+            item.setFlags(item.flags() | QtCore.Qt.ItemIsEditable)
             self.ui.soundList.addItem(item)
 
         # Positioning
-        self._apply_style_mode_from_uts(uts)
+        self.ui.styleOnceRadio.setChecked(False)
+        self.ui.styleSeamlessRadio.setChecked(False)
+        self.ui.styleRepeatRadio.setChecked(False)
+        if uts.continuous and uts.looping:
+            self.ui.styleSeamlessRadio.setChecked(True)
+        elif uts.looping:
+            self.ui.styleRepeatRadio.setChecked(True)
+        else:
+            self.ui.styleOnceRadio.setChecked(True)
 
-        self.ui.cutoffSpin.setValue(uts.min_distance)
-        self.ui.maxVolumeDistanceSpin.setValue(uts.max_distance)
+        self.ui.cutoffSpin.setValue(uts.max_distance)
+        self.ui.maxVolumeDistanceSpin.setValue(uts.min_distance)
         self.ui.heightSpin.setValue(uts.elevation)
         self.ui.northRandomSpin.setValue(uts.random_range_y)
         self.ui.eastRandomSpin.setValue(uts.random_range_x)
@@ -183,52 +130,55 @@ class UTSEditor(Editor):
         self.ui.commentsEdit.setPlainText(uts.comment)
 
     def build(self) -> tuple[bytes, bytes]:
-        """Builds a UTS from UI data.
-
-        Returns:
-        -------
-            tuple[bytes, bytes]: GFF data and log.
-
-        Populates UTS from UI, then dismantle_uts (K1 LoadSounds 0x00505560, TSL 0x0071c730 (Aspyr)). Returns GFF bytes and log.
-        """
+        """Builds a UTS from UI fields."""
         uts: UTS = deepcopy(self._uts)
 
         # Basic
         uts.name = self.ui.nameEdit.locstring()
         uts.tag = self.ui.tagEdit.text()
-        uts.resref = ResRef(self.ui.resrefEdit.text())
+        if str(uts.resref) != self.ui.resrefEdit.text():
+            uts.resref = ResRef(self.ui.resrefEdit.text())
         uts.volume = self.ui.volumeSlider.value()
         uts.active = self.ui.activeCheckbox.isChecked()
 
         # Advanced
+        uts.random_range_x = self.ui.northRandomSpin.value()
+        uts.random_range_y = self.ui.eastRandomSpin.value()
         uts.positional = self.ui.playSpecificRadio.isChecked()
         uts.random_pick = self.ui.orderRandomRadio.isChecked()
         uts.interval = self.ui.intervalSpin.value()
         uts.interval_variation = self.ui.intervalVariationSpin.value()
         uts.volume_variation = self.ui.volumeVariationSlider.value()
-        uts.pitch_variation = self.ui.pitchVariationSlider.value() / 100
+        if int(uts.pitch_variation * 100) != self.ui.pitchVariationSlider.value():
+            uts.pitch_variation = self.ui.pitchVariationSlider.value() / 100
 
         # Sounds
-        uts.sounds = [
-            ResRef(item.text())
-            for i in range(self.ui.soundList.count())
-            if (item := self.ui.soundList.item(i)) is not None
-        ]
+        uts.sounds = []
+        for i in range(self.ui.soundList.count()):
+            item = self.ui.soundList.item(i)
+            original = item.data(QtCore.Qt.UserRole)
+            sound = deepcopy(original) if original is not None else ResRef.from_blank()
+            if str(sound) != item.text():
+                sound.set_data(item.text())
+            uts.sounds.append(sound)
 
         # Positioning
-        uts.continuous = self.ui.styleSeamlessRadio.isChecked()
-        uts.looping = self.ui.styleSeamlessRadio.isChecked() or self.ui.styleRepeatRadio.isChecked()
+        original_style = "seamless" if uts.continuous and uts.looping else "repeat" if uts.looping else "once"
+        selected_style = "seamless" if self.ui.styleSeamlessRadio.isChecked() else "repeat" if self.ui.styleRepeatRadio.isChecked() else "once"
+        if selected_style != original_style:
+            uts.continuous = selected_style == "seamless"
+            uts.looping = selected_style != "once"
         uts.max_distance = self.ui.maxVolumeDistanceSpin.value()
         uts.min_distance = self.ui.cutoffSpin.value()
         uts.elevation = self.ui.heightSpin.value()
-        uts.random_range_y = self.ui.northRandomSpin.value()
-        uts.random_range_x = self.ui.eastRandomSpin.value()
+        uts.random_range_x = self.ui.northRandomSpin.value()
+        uts.random_range_y = self.ui.eastRandomSpin.value()
 
         # Comments
         uts.comment = self.ui.commentsEdit.toPlainText()
 
         data = bytearray()
-        gff: GFF = dismantle_uts(uts)
+        gff = dismantle_uts(uts)
         write_gff(gff, data)
 
         return data, b""
@@ -237,57 +187,23 @@ class UTSEditor(Editor):
         super().new()
         self._loadUTS(UTS())
 
-    def _apply_play_mode_from_uts(self, uts: UTS) -> None:
-        """Update play mode radio buttons from UTS playback fields."""
-        for radio in (
-            self.ui.playRandomRadio,
-            self.ui.playSpecificRadio,
-            self.ui.playEverywhereRadio,
-        ):
-            radio.setChecked(False)
 
-        if uts.random_range_x != 0 and uts.random_range_y != 0:
-            self.ui.playRandomRadio.setChecked(True)
-        elif uts.positional:
-            self.ui.playSpecificRadio.setChecked(True)
-        else:
-            self.ui.playEverywhereRadio.setChecked(True)
-
-    def _apply_style_mode_from_uts(self, uts: UTS) -> None:
-        """Update style radio buttons from UTS looping/continuous fields."""
-        for radio in (self.ui.styleOnceRadio, self.ui.styleSeamlessRadio, self.ui.styleRepeatRadio):
-            radio.setChecked(False)
-
-        if uts.continuous and uts.looping:
-            self.ui.styleSeamlessRadio.setChecked(True)
-        elif uts.looping:
-            self.ui.styleRepeatRadio.setChecked(True)
-        else:
-            self.ui.styleOnceRadio.setChecked(True)
-
-    def change_name(self):
-        assert self._installation is not None
-        dialog = LocalizedStringDialog(self, self._installation, self.ui.nameEdit.locstring())
-        if dialog.exec():
-            self._load_locstring(self.ui.nameEdit.ui.locstringText, dialog.locstring)
-
-    def generate_tag(self):
+    def generateTag(self):
         if self.ui.resrefEdit.text() == "":
-            self.generate_resref()
+            self.generateResref()
         self.ui.tagEdit.setText(self.ui.resrefEdit.text())
 
-    def generate_resref(self):
+    def generateResref(self):
         if self._resname is not None and self._resname != "":
             self.ui.resrefEdit.setText(self._resname)
         else:
             self.ui.resrefEdit.setText("m00xx_trg_000")
 
-    def change_style(self):
-        def _set_ui_style_groups(boolean: bool):  # noqa: FBT001
+    def changeStyle(self):
+        def _set_ui_style_groups(boolean: bool):
             self.ui.intervalGroup.setEnabled(boolean)
             self.ui.orderGroup.setEnabled(boolean)
             self.ui.variationGroup.setEnabled(boolean)
-
         _set_ui_style_groups(True)
         if self.ui.styleSeamlessRadio.isChecked():
             _set_ui_style_groups(False)
@@ -296,12 +212,11 @@ class UTSEditor(Editor):
         elif self.ui.styleOnceRadio.isChecked():
             self.ui.intervalGroup.setEnabled(False)
 
-    def change_play(self):
-        def _set_ui_play_groups(boolean: bool):  # noqa: FBT001
+    def changePlay(self):
+        def _set_ui_play_groups(boolean: bool):
             self.ui.rangeGroup.setEnabled(boolean)
             self.ui.heightGroup.setEnabled(boolean)
             self.ui.distanceGroup.setEnabled(boolean)
-
         _set_ui_play_groups(True)
         if self.ui.playRandomRadio.isChecked():
             ...
@@ -312,76 +227,49 @@ class UTSEditor(Editor):
         elif self.ui.playEverywhereRadio.isChecked():
             _set_ui_play_groups(False)
 
-    def play_sound(self):
+    def playSound(self):
         self.player.stop()
 
-        cur_item: QListWidgetItem | None = self.ui.soundList.currentItem()
-        cur_item_text: str | None = cur_item.text() if cur_item else None
-        if not cur_item or not cur_item_text:
-            return None
+        if not self.ui.soundList.currentItem().text():
+            return
 
-        resname: str = cur_item_text
-        assert self._installation is not None
+        resname: str = self.ui.soundList.currentItem().text()
         data: bytes | None = self._installation.sound(resname)
 
         if data:
-            self.play_byte_source_media(data)
-            return True
-        QMessageBox(
-            QMessageBox.Icon.Critical,
-            "Could not find audio file",
-            f"Could not find audio resource '{resname}'.",
-        )
+            self.buffer = QBuffer(self)
+            self.buffer.setData(data)
+            self.buffer.open(QIODevice.ReadOnly)
+            self.player.setMedia(QMediaContent(), self.buffer)
+            QtCore.QTimer.singleShot(0, self.player.play)
+        else:
+            QMessageBox(QMessageBox.Critical, "Could not find audio file", f"Could not find audio resource '{resname}'.")
 
-    def add_sound(self):
+    def addSound(self):
         item = QListWidgetItem("new sound")
-        item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsEditable)
+        item.setFlags(item.flags() | QtCore.Qt.ItemIsEditable)
         self.ui.soundList.addItem(item)
 
-    def remove_sound(self):
+    def removeSound(self):
         if self.ui.soundList.currentRow() == -1:
             return
         self.ui.soundList.takeItem(self.ui.soundList.currentRow())
 
-    def move_sound_up(self):
-        if self.ui.soundList.currentRow() == -1:
+    def moveSoundUp(self):
+        row = self.ui.soundList.currentRow()
+        if row <= 0:
             return
-        cur_item: QListWidgetItem | None = self.ui.soundList.currentItem()
-        if cur_item is None:
-            return
-        resname: str = cur_item.text()
-        row: int = self.ui.soundList.currentRow()
-        self.ui.soundList.takeItem(self.ui.soundList.currentRow())
-        self.ui.soundList.insertItem(row - 1, resname)
+        item = self.ui.soundList.takeItem(row)
+        self.ui.soundList.insertItem(row - 1, item)
         self.ui.soundList.setCurrentRow(row - 1)
-        item: QListWidgetItem | None = self.ui.soundList.item(row - 1)
-        if item is None:
-            return
-        item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsEditable)
 
-    def move_sound_down(self):
-        if self.ui.soundList.currentRow() == -1:
+    def moveSoundDown(self):
+        row = self.ui.soundList.currentRow()
+        if row < 0 or row >= self.ui.soundList.count() - 1:
             return
-        cur_item: QListWidgetItem | None = self.ui.soundList.currentItem()
-        if cur_item is None:
-            return
-        resname: str = cur_item.text()
-        row: int = self.ui.soundList.currentRow()
-        self.ui.soundList.takeItem(self.ui.soundList.currentRow())
-        self.ui.soundList.insertItem(row + 1, resname)
+        item = self.ui.soundList.takeItem(row)
+        self.ui.soundList.insertItem(row + 1, item)
         self.ui.soundList.setCurrentRow(row + 1)
-        item: QListWidgetItem | None = self.ui.soundList.item(row + 1)
-        if item is None:
-            return
-        item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsEditable)
 
     def closeEvent(self, e: QCloseEvent):
         self.player.stop()
-
-
-if __name__ == "__main__":
-    import sys
-
-    from toolset.gui.editors.standalone import launch_editor_cli
-
-    sys.exit(launch_editor_cli("uts"))

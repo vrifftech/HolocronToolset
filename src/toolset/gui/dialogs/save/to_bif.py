@@ -1,15 +1,6 @@
-"""Save-to-BIF dialog: choose MOD/Override option when saving into a BIF."""
-
-from __future__ import annotations
-
 from enum import IntEnum
-from typing import TYPE_CHECKING
 
-from qtpy.QtCore import Qt
-from qtpy.QtWidgets import QDialog
-
-if TYPE_CHECKING:
-    from qtpy.QtWidgets import QWidget
+from PyQt5.QtWidgets import QDialog, QWidget
 
 
 class BifSaveOption(IntEnum):
@@ -19,44 +10,24 @@ class BifSaveOption(IntEnum):
 
 
 class BifSaveDialog(QDialog):
-    def __init__(
-        self,
-        parent: QWidget,
-    ):
+    def __init__(self, parent: QWidget):
         super().__init__(parent)
-        self.setWindowFlags(
-            Qt.WindowType.Dialog  # pyright: ignore[reportArgumentType]
-            | Qt.WindowType.WindowCloseButtonHint
-            | Qt.WindowType.WindowStaysOnTopHint
-            & ~Qt.WindowType.WindowContextHelpButtonHint
-            & ~Qt.WindowType.WindowMinimizeButtonHint,
-        )
 
-        from toolset.uic.qtpy.dialogs.save_in_bif import Ui_Dialog
+        from toolset.uic.dialogs import save_in_bif
 
-        self.ui = Ui_Dialog()
+        self.ui = save_in_bif.Ui_Dialog()
         self.ui.setupUi(self)
 
-        # Size to content so button text is never clipped (any DPI/font)
-        self.adjustSize()
-        self.setMinimumSize(self.sizeHint())
-
-        # Setup event filter to prevent scroll wheel interaction with controls
-        from toolset.gui.common.filters import NoScrollEventFilter
-
-        self._no_scroll_filter = NoScrollEventFilter(self)
-        self._no_scroll_filter.setup_filter(parent_widget=self)
-
-        self.ui.cancelButton.clicked.connect(lambda: self.reject())
-        self.ui.modSaveButton.clicked.connect(lambda: self.save_as_mod())
-        self.ui.overrideSaveButton.clicked.connect(lambda: self.save_as_override())
+        self.ui.cancelButton.clicked.connect(self.reject)
+        self.ui.modSaveButton.clicked.connect(self.saveAsMod)
+        self.ui.overrideSaveButton.clicked.connect(self.saveAsOverride)
 
         self.option: BifSaveOption = BifSaveOption.Nothing
 
-    def save_as_mod(self):
+    def saveAsMod(self):
         self.option = BifSaveOption.MOD
         self.accept()
 
-    def save_as_override(self):
+    def saveAsOverride(self):
         self.option = BifSaveOption.Override
         self.accept()

@@ -20,7 +20,7 @@
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
-      <widget class="RobustTreeView" name="treeView">
+      <widget class="QTreeView" name="treeView">
        <property name="font">
         <font>
          <family>Courier New</family>
@@ -44,7 +44,7 @@
            <bool>false</bool>
           </property>
           <property name="title">
-           <string />
+           <string/>
           </property>
           <layout class="QFormLayout" name="formLayout">
            <item row="0" column="0">
@@ -200,7 +200,7 @@
           <widget class="QWidget" name="intPage">
            <layout class="QVBoxLayout" name="verticalLayout_5">
             <item>
-             <widget class="LongSpinBox" name="intSpin" />
+             <widget class="LongSpinBox" name="intSpin"/>
             </item>
             <item>
              <spacer name="verticalSpacer_3">
@@ -217,7 +217,7 @@
             </item>
            </layout>
           </widget>
-          <widget class="QWidget" name="blankPage" />
+          <widget class="QWidget" name="blankPage"/>
           <widget class="QWidget" name="floatPage">
            <layout class="QVBoxLayout" name="verticalLayout_4">
             <item>
@@ -402,7 +402,7 @@
           <widget class="QWidget" name="textPage">
            <layout class="QGridLayout" name="gridLayout">
             <item row="0" column="0">
-             <widget class="QPlainTextEdit" name="textEdit" />
+             <widget class="QPlainTextEdit" name="textEdit"/>
             </item>
            </layout>
           </widget>
@@ -549,7 +549,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QPlainTextEdit" name="substringEdit" />
+             <widget class="QPlainTextEdit" name="substringEdit"/>
             </item>
            </layout>
           </widget>
@@ -574,23 +574,23 @@
     <property name="title">
      <string>File</string>
     </property>
-    <addaction name="actionNew" />
-    <addaction name="actionOpen" />
-    <addaction name="actionSave" />
-    <addaction name="actionSave_As" />
-    <addaction name="separator" />
-    <addaction name="actionRevert" />
-    <addaction name="separator" />
-    <addaction name="actionExit" />
+    <addaction name="actionNew"/>
+    <addaction name="actionOpen"/>
+    <addaction name="actionSave"/>
+    <addaction name="actionSave_As"/>
+    <addaction name="separator"/>
+    <addaction name="actionRevert"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menuTools">
     <property name="title">
      <string>Tools</string>
     </property>
-    <addaction name="actionSetTLK" />
+    <addaction name="actionSetTLK"/>
    </widget>
-   <addaction name="menuFile" />
-   <addaction name="menuTools" />
+   <addaction name="menuFile"/>
+   <addaction name="menuTools"/>
   </widget>
   <action name="actionNew">
    <property name="text">
@@ -630,21 +630,11 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>RobustTreeView</class>
-   <extends>QTreeView</extends>
-   <header location="global">utility.gui.qt.widgets.itemviews.treeview</header>
-  </customwidget>
-  <customwidget>
-   <class>GFFFieldSpinBox</class>
-   <extends>QSpinBox</extends>
-   <header location="global">toolset.gui.editors.dlg</header>
-  </customwidget>
-  <customwidget>
    <class>LongSpinBox</class>
    <extends>QSpinBox</extends>
    <header location="global">toolset.gui.widgets.long_spinbox</header>
   </customwidget>
  </customwidgets>
- <resources />
- <connections />
+ <resources/>
+ <connections/>
 </ui>

@@ -1,443 +1,464 @@
-"""Generic GFF editor: tree view, field editing, substring search, and locstring support."""
-
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+import math
+import struct
+from typing import TYPE_CHECKING, Any
 
-from qtpy.QtCore import QItemSelectionRange, QModelIndex, QSortFilterProxyModel, Qt
-from qtpy.QtGui import QBrush, QColor, QFont, QStandardItem, QStandardItemModel
-from qtpy.QtWidgets import (
-    QApplication,
-    QFileDialog,
-    QLabel,
-    QListWidgetItem,
-    QMenu,
-    QMessageBox,
-    QPushButton,
-    QShortcut,  # pyright: ignore[reportPrivateImportUsage]
-    QSizePolicy,
-    QVBoxLayout,
-    QWidget,
-)
-
+from pykotor.common.geometry import Vector3, Vector4
 from pykotor.common.language import Gender, Language, LocalizedString
 from pykotor.common.misc import ResRef
 from pykotor.extract.talktable import TalkTable
-from pykotor.resource.formats.gff import (
-    GFF,
-    GFFContent,
-    GFFFieldType,
-    GFFList,
-    GFFStruct,
-    read_gff,
-    write_gff,
-)
-from toolset.utils.resource_type_compat import RESOURCE_FORMAT, ResourceType, ToolsetFormat
-from toolset.gui.common.localization import translate as tr
+from pykotor.resource.formats.gff import GFF, GFFContent, GFFFieldType, GFFList, GFFStruct, read_gff, write_gff
+from pykotor.resource.type import ResourceType
+from PyQt5 import QtCore
+from PyQt5.QtCore import QItemSelectionRange, QModelIndex, QSortFilterProxyModel
+from PyQt5.QtGui import QBrush, QColor, QStandardItem, QStandardItemModel
+from PyQt5.QtWidgets import QFileDialog, QListWidgetItem, QMenu, QMessageBox, QShortcut, QWidget
 from toolset.gui.editor import Editor
-from utility.common.geometry import Vector3, Vector4
+from utility.error_handling import format_exception_with_variables
 
 if TYPE_CHECKING:
     import os
 
-    from qtpy.QtCore import (
-        QAbstractItemModel,
-        QItemSelectionModel,
-        QItemSelectionRange,
-        QModelIndex,
-        QPoint,
-    )
-    from qtpy.QtGui import QClipboard, QPalette
-    from qtpy.QtWidgets import QLayout, QLayoutItem, QWidget, _QMenu
+    from pykotor.extract.installation import Installation
 
-    from toolset.data.installation import HTInstallation
+_VALUE_NODE_ROLE = QtCore.Qt.UserRole + 1
+_RAW_NODE_ROLE = QtCore.Qt.UserRole + 10
+_ORIGINAL_NODE_ROLE = QtCore.Qt.UserRole + 11
+_TYPE_NODE_ROLE = QtCore.Qt.UserRole + 2
+_LABEL_NODE_ROLE = QtCore.Qt.UserRole + 3
 
-_VALUE_NODE_ROLE: int = Qt.ItemDataRole.UserRole + 1
-_TYPE_NODE_ROLE: int = Qt.ItemDataRole.UserRole + 2
-_LABEL_NODE_ROLE: int = Qt.ItemDataRole.UserRole + 3
+_ID_SUBSTRING_ROLE = QtCore.Qt.UserRole + 1
+_TEXT_SUBSTRING_ROLE = QtCore.Qt.UserRole + 2
 
-_ID_SUBSTRING_ROLE: int = Qt.ItemDataRole.UserRole + 1
-_TEXT_SUBSTRING_ROLE: int = Qt.ItemDataRole.UserRole + 2
+
+_INTEGER_RANGES = {
+    GFFFieldType.UInt8: (0, 0xFF),
+    GFFFieldType.UInt16: (0, 0xFFFF),
+    GFFFieldType.UInt32: (0, 0xFFFFFFFF),
+    GFFFieldType.UInt64: (0, 0xFFFFFFFFFFFFFFFF),
+    GFFFieldType.Int8: (-0x80, 0x7F),
+    GFFFieldType.Int16: (-0x8000, 0x7FFF),
+    GFFFieldType.Int32: (-0x80000000, 0x7FFFFFFF),
+    GFFFieldType.Int64: (-0x8000000000000000, 0x7FFFFFFFFFFFFFFF),
+}
 
 
 class GFFEditor(Editor):
-    def __init__(
-        self,
-        parent: QWidget | None,
-        installation: HTInstallation | None = None,
-    ):
+    def __init__(self, parent: QWidget | None, installation: Installation | None = None):
         supported: list[ResourceType] = [
-            restype for restype in ResourceType if restype.contents == "gff"
+            ResourceType.GFF,
+            ResourceType.UTC,
+            ResourceType.UTP,
+            ResourceType.UTD,
+            ResourceType.UTI,
+            ResourceType.UTM,
+            ResourceType.UTE,
+            ResourceType.UTT,
+            ResourceType.UTW,
+            ResourceType.UTS,
+            ResourceType.DLG,
+            ResourceType.GUI,
+            ResourceType.ARE,
+            ResourceType.IFO,
+            ResourceType.GIT,
+            ResourceType.JRL,
+            ResourceType.ITP,
         ]
         super().__init__(parent, "GFF Editor", "none", supported, supported, installation)
         self.resize(400, 250)
 
         self._talktable: TalkTable | None = installation.talktable() if installation else None
-        self._gff_content: GFFContent | None = None
 
-        from toolset.uic.qtpy.editors.gff import Ui_MainWindow
+        from toolset.uic.editors.gff import Ui_MainWindow
 
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
-        self._setup_menus()
-        self._add_help_action()
-        self._setup_signals()
+        self.ui.substringLangCombo.clear()
+        for language in Language:
+            if language.get_encoding() is not None:
+                self.ui.substringLangCombo.addItem(language.name.title(), int(language))
+        self._setupMenus()
+        self._setupSignals()
 
-        self.ui.treeView.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
-        self.ui.treeView.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+        self.ui.treeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         self.ui.treeView.setSortingEnabled(True)
-
-        # Setup event filter to prevent scroll wheel interaction with controls
-        from toolset.gui.common.filters import NoScrollEventFilter
-
-        self._no_scroll_filter = NoScrollEventFilter(self)
-        self._no_scroll_filter.setup_filter(parent_widget=self)
 
         # Make the right panel take as little space possible
         self.ui.splitter.setSizes([99999999, 1])
 
         self.new()
 
-    def _setup_signals(self):
-        self.ui.actionSetTLK.triggered.connect(self.select_talk_table)
+    def _setupSignals(self):
+        """Sets up signals and connections for the GUI.
+
+        Args:
+        ----
+            self: The class instance.
+
+        Processing Logic:
+        ----------------
+            - Connects actions to methods like selecting talk tables
+            - Sets up models and views for the tree widget
+            - Connects editing signals from widgets to updateData()
+            - Connects context menu requests
+            - Connects type combo box changes.
+        """
+        self.ui.actionSetTLK.triggered.connect(self.selectTalkTable)
 
         self.model: QStandardItemModel = QStandardItemModel(self)
-        self.proxy_model: QSortFilterProxyModel = GFFSortFilterProxyModel(self)
-        self.proxy_model.setSourceModel(self.model)
-        self.ui.treeView.setModel(self.proxy_model)
+        self.proxyModel: QSortFilterProxyModel = GFFSortFilterProxyModel(self)
+        self.proxyModel.setSourceModel(self.model)
+        self.ui.treeView.setModel(self.proxyModel)
 
-        sel_model: QItemSelectionModel | None = self.ui.treeView.selectionModel()
-        assert sel_model is not None
-        sel_model.selectionChanged.connect(self.selection_changed)
-        for signal in (
-            self.ui.intSpin.editingFinished,
-            self.ui.floatSpin.editingFinished,
-            self.ui.lineEdit.editingFinished,
-            self.ui.textEdit.textChanged,
-            self.ui.xVec3Spin.editingFinished,
-            self.ui.yVec3Spin.editingFinished,
-            self.ui.zVec3Spin.editingFinished,
-            self.ui.xVec4Spin.editingFinished,
-            self.ui.yVec4Spin.editingFinished,
-            self.ui.zVec4Spin.editingFinished,
-            self.ui.wVec4Spin.editingFinished,
-            self.ui.labelEdit.editingFinished,
-        ):
-            signal.connect(self.update_data)
+        self.ui.treeView.selectionModel().selectionChanged.connect(self.selectionChanged)
+        self.ui.intSpin.editingFinished.connect(self.updateData)
+        self.ui.floatSpin.editingFinished.connect(self.updateData)
+        self.ui.lineEdit.editingFinished.connect(self.updateData)
+        self.ui.textEdit.textChanged.connect(self.updateData)
+        self.ui.xVec3Spin.editingFinished.connect(self.updateData)
+        self.ui.yVec3Spin.editingFinished.connect(self.updateData)
+        self.ui.zVec3Spin.editingFinished.connect(self.updateData)
+        self.ui.xVec4Spin.editingFinished.connect(self.updateData)
+        self.ui.yVec4Spin.editingFinished.connect(self.updateData)
+        self.ui.zVec4Spin.editingFinished.connect(self.updateData)
+        self.ui.wVec4Spin.editingFinished.connect(self.updateData)
+        self.ui.labelEdit.editingFinished.connect(self.updateData)
 
-        self.ui.stringrefSpin.valueChanged.connect(self.change_locstring_text)
-        self.ui.stringrefSpin.editingFinished.connect(self.update_data)
+        self.ui.stringrefSpin.valueChanged.connect(self.changeLocstringText)
+        self.ui.stringrefSpin.editingFinished.connect(self.updateData)
         self.ui.substringList.itemSelectionChanged.connect(self.substringSelected)
-        self.ui.addSubstringButton.clicked.connect(self.add_substring)
-        self.ui.removeSubstringButton.clicked.connect(self.remove_substring)
-        self.ui.substringEdit.textChanged.connect(self.substring_edited)
+        self.ui.addSubstringButton.clicked.connect(self.addSubstring)
+        self.ui.removeSubstringButton.clicked.connect(self.removeSubstring)
+        self.ui.substringEdit.textChanged.connect(self.substringEdited)
 
-        self.ui.treeView.customContextMenuRequested.connect(self.on_context_menu)
+        self.ui.treeView.customContextMenuRequested.connect(self.requestContextMenu)
 
-        self.ui.typeCombo.activated.connect(self.type_changed)
+        self.ui.typeCombo.activated.connect(self.typeChanged)
 
-        QShortcut("Del", self).activated.connect(self.remove_selected_nodes)
+        QShortcut("Del", self).activated.connect(self.removeSelectedNodes)
 
-    def load(
-        self,
-        filepath: os.PathLike | str,
-        resref: str,
-        restype: ResourceType,
-        data: bytes,
-    ):
+    def load(self, filepath: os.PathLike | str, resref: str, restype: ResourceType, data: bytes):
+        """Loads resource data from a file into the model.
+
+        Args:
+        ----
+            filepath: {Path or filename to load from}
+            resref: {Unique identifier for resource}
+            restype: {Type of resource}
+            data: {Resource data}.
+
+        Processing Logic:
+        ----------------
+            - Reads GFF data structure from loaded bytes
+            - Clears existing model data
+            - Sets model column count to 1
+            - Adds root node to model
+            - Recursively loads GFF structure into model from root node
+            - Expands root node in tree view after loading.
+        """
         super().load(filepath, resref, restype, data)
         gff: GFF = read_gff(data)
-        self._gff_content = gff.content
 
         self.model.clear()
         self.model.setColumnCount(1)
 
-        root_node = QStandardItem("[ROOT]")
-        self.apply_palette(root_node, GFFFieldType.Struct)
-        # root_node.setForeground(QBrush(QColor(0x660000)))
-        self.model.appendRow(root_node)
-        self._load_struct(root_node, gff.root)
+        rootNode = QStandardItem("[ROOT]")
+        rootNode.setForeground(QBrush(QColor(0x660000)))
+        self.model.appendRow(rootNode)
+        rootNode.setData(gff.root.struct_id, _VALUE_NODE_ROLE)
+        self._load_struct(rootNode, gff.root)
 
-        source_index: QModelIndex = self.model.indexFromItem(root_node)
-        proxy_index: QModelIndex = self.proxy_model.mapFromSource(source_index)
-        self.ui.treeView.expand(proxy_index)
+        sourceIndex = self.model.indexFromItem(rootNode)
+        proxyIndex = self.proxyModel.mapFromSource(sourceIndex)
+        self.ui.treeView.expand(proxyIndex)
 
-    def _load_struct(
-        self,
-        node: QStandardItem,
-        gff_struct: GFFStruct,
-    ):
-        for label, ftype, value in gff_struct:
-            child_node = QStandardItem("")
-            child_node.setData(ftype, _TYPE_NODE_ROLE)
-            child_node.setData(label, _LABEL_NODE_ROLE)
+    def _load_struct(self, node: QStandardItem, gffStruct: GFFStruct):
+        """Loads a GFFStruct into a QStandardItem node.
+
+        Args:
+        ----
+            node: QStandardItem - The parent node to load the struct into
+            gffStruct: GFFStruct - The struct to load
+
+        Processing Logic:
+        ----------------
+            - Loops through each field in the struct
+            - Creates a child node for each field
+            - Sets the node type, label and value
+            - Handles list and struct field types recursively
+            - Appends the child node to the parent node.
+        """
+        for label, field in gffStruct._field_order:
+            ftype, value = field.field_type(), field.value()
+            childNode = QStandardItem("")
+            childNode.setData(ftype, _TYPE_NODE_ROLE)
+            childNode.setData(label, _LABEL_NODE_ROLE)
+            if ftype is GFFFieldType.String:
+                childNode.setData(field.raw_data, _RAW_NODE_ROLE)
+                childNode.setData(value, _ORIGINAL_NODE_ROLE)
 
             if ftype == GFFFieldType.List:
-                self.apply_palette(child_node, GFFFieldType.List)
-                # child_node.setForeground(QBrush(QColor(0x000088)))
-                self._load_list(child_node, value)
+                childNode.setForeground(QBrush(QColor(0x000088)))
+                self._load_list(childNode, value)
             elif ftype == GFFFieldType.Struct:
-                assert isinstance(value, GFFStruct)
-                self.apply_palette(child_node, GFFFieldType.Struct)
-                # child_node.setForeground(QBrush(QColor(0x660000)))
-                child_node.setData(value.struct_id, _VALUE_NODE_ROLE)
-                self._load_struct(child_node, value)
+                childNode.setForeground(QBrush(QColor(0x660000)))
+                childNode.setData(value.struct_id, _VALUE_NODE_ROLE)
+                self._load_struct(childNode, value)
             else:
-                child_node.setData(value, _VALUE_NODE_ROLE)
+                childNode.setData(value, _VALUE_NODE_ROLE)
 
-            self.apply_palette(node, GFFFieldType.Struct)
-            self.refresh_item_text(child_node)
-            node.appendRow(child_node)
+            self.refreshItemText(childNode)
+            node.appendRow(childNode)
 
-    def _load_list(
-        self,
-        node: QStandardItem,
-        gff_list: GFFList,
-    ):
-        for gff_struct in gff_list:
-            child_node = QStandardItem("")
-            self.apply_palette(child_node, GFFFieldType.Struct)
-            # child_node.setForeground(QBrush(QColor(0x660000)))
-            child_node.setData(gff_struct.struct_id, _VALUE_NODE_ROLE)
-            node.appendRow(child_node)
-            self.refresh_item_text(child_node)
-            self._load_struct(child_node, gff_struct)
+    def _load_list(self, node: QStandardItem, gffList: GFFList):
+        """Load GFF data into a tree view.
 
-        self.apply_palette(node, GFFFieldType.List)
+        Args:
+        ----
+            node: QStandardItem - Parent node to add children
+            gffList: GFFList - List of GFF structures to load
+
+        Processing Logic:
+        ----------------
+            - Loop through each GFF structure in the list
+            - Create a child node for each structure
+            - Set the node text and color
+            - Add the node to the parent node
+            - Load any child data for the structure into the node.
+        """
+        for gffStruct in gffList:
+            childNode = QStandardItem("")
+            childNode.setForeground(QBrush(QColor(0x660000)))
+            childNode.setData(gffStruct.struct_id, _VALUE_NODE_ROLE)
+            node.appendRow(childNode)
+            self.refreshItemText(childNode)
+            self._load_struct(childNode, gffStruct)
 
     def build(self) -> tuple[bytes, bytes]:
-        gff_content: GFFContent | None = self._gff_content or GFFContent.from_res(
-            self._resname or ""
-        )
-        assert gff_content is not None
+        """Builds a GFF file from the model.
 
-        # Determine if we should write as XML based on file extension
-        gff_type: RESOURCE_FORMAT = ResourceType.GFF
-        if self._filepath is not None:
-            suffix = self._filepath.suffix.lower()
-            if suffix.endswith(".xml"):
-                gff_type = ToolsetFormat.GFF_XML
-            elif suffix.endswith(".json"):
-                gff_type = ToolsetFormat.GFF_JSON
+        Args:
+        ----
+            self: The object calling the function.
 
-        gff = GFF(gff_content)
-        item: QStandardItem | None = self.model.item(0, 0)
-        assert item is not None, "item cannot be None"
-        self._build_struct(item, gff.root)
+        Returns:
+        -------
+            bytes: The built GFF file
+            bytes: An empty byte array
+
+        Processing Logic:
+        ----------------
+            - Creates a GFFContent object to hold the GFF data
+            - Initializes a GFF object with the GFFContent
+            - Calls _build_struct to populate the GFF structure from the model
+            - Writes the populated GFF to a byte array
+            - Returns the byte array and an empty byte array.
+        """
+        try:
+            content = GFFContent(f"{self._restype.extension.upper()} ")
+        except ValueError as e:
+            print(format_exception_with_variables(e))
+            content = GFFContent.GFF
+
+        gff = GFF(content)
+
+        self._build_struct(self.model.item(0, 0), gff.root)
 
         data = bytearray()
-        write_gff(gff, data, gff_type)
-        return bytes(data), b""
+        write_gff(gff, data)
+        return data, b""
 
-    def _build_struct(  # noqa: C901, PLR0912
-        self,
-        item: QStandardItem,
-        gff_struct: GFFStruct,
-    ):
+    def _build_struct(self, item: QStandardItem, gffStruct: GFFStruct):
+        """Builds a GFF structure from a QStandardItem model.
+
+        Args:
+        ----
+            item: QStandardItem - Item containing node data
+            gffStruct: GFFStruct - Structure to populate.
+
+        Processing Logic:
+        ----------------
+            - Loops through each child node of the item
+            - Gets label, value, and type from node data
+            - Calls corresponding set method on gffStruct based on type
+            - Recursively builds child structures and lists.
+        """
+        struct_id = item.data(_VALUE_NODE_ROLE)
+        if struct_id is not None:
+            gffStruct.struct_id = struct_id
         for i in range(item.rowCount()):
-            child: QStandardItem | None = item.child(i, 0)
-            assert child is not None
-            label: str = child.data(_LABEL_NODE_ROLE)
-            value: Any = child.data(_VALUE_NODE_ROLE)
-            ftype: GFFFieldType | None = child.data(_TYPE_NODE_ROLE)
+            child = item.child(i, 0)
+            label = child.data(_LABEL_NODE_ROLE)
+            value = child.data(_VALUE_NODE_ROLE)
+            kind = child.data(_TYPE_NODE_ROLE)
+            raw_data = None
+            if kind is GFFFieldType.Struct:
+                value = GFFStruct(value)
+                self._build_struct(child, value)
+            elif kind is GFFFieldType.List:
+                value = GFFList()
+                self._build_list(child, value)
+            elif kind is GFFFieldType.String and value == child.data(_ORIGINAL_NODE_ROLE):
+                raw_data = child.data(_RAW_NODE_ROLE)
+            gffStruct.add_field(label, kind, value, raw_data=raw_data)
 
-            # Mapping of GFFFieldType to setter methods for simple types
-            field_setters = {
-                GFFFieldType.UInt8: gff_struct.set_uint8,
-                GFFFieldType.UInt16: gff_struct.set_uint16,
-                GFFFieldType.UInt32: gff_struct.set_uint32,
-                GFFFieldType.UInt64: gff_struct.set_uint64,
-                GFFFieldType.Int8: gff_struct.set_int8,
-                GFFFieldType.Int16: gff_struct.set_int16,
-                GFFFieldType.Int32: gff_struct.set_int32,
-                GFFFieldType.Int64: gff_struct.set_int64,
-                GFFFieldType.Single: gff_struct.set_single,
-                GFFFieldType.Double: gff_struct.set_double,
-                GFFFieldType.ResRef: gff_struct.set_resref,
-                GFFFieldType.String: gff_struct.set_string,
-                GFFFieldType.LocalizedString: gff_struct.set_locstring,
-                GFFFieldType.Binary: gff_struct.set_binary,
-                GFFFieldType.Vector3: gff_struct.set_vector3,
-                GFFFieldType.Vector4: gff_struct.set_vector4,
-            }
+    def _build_list(self, item: QStandardItem, gffList: GFFList):
+        """Builds a list of GFF structures from a QStandardItem tree.
 
-            if ftype in field_setters:
-                field_setters[ftype](label, value)
+        Args:
+        ----
+            item: QStandardItem: The root item of the tree
+            gffList: GFFList: The list to populate.
 
-            if ftype == GFFFieldType.Struct:
-                childGffStruct = GFFStruct(value)
-                gff_struct.set_struct(label, childGffStruct)
-                self._build_struct(child, childGffStruct)
-
-            if ftype == GFFFieldType.List:
-                childGffList = GFFList()
-                gff_struct.set_list(label, childGffList)
-                self._build_list(child, childGffList)
-
-    def _build_list(
-        self,
-        item: QStandardItem,
-        gff_list: GFFList,
-    ):
+        Processing Logic:
+        ----------------
+            - Loops through each child row of the item
+            - Gets the struct ID from the child data
+            - Adds a new GFF structure to the list with that ID
+            - Recursively builds the child structure.
+        """
         for i in range(item.rowCount()):
-            child: QStandardItem | None = item.child(i, 0)
-            assert child is not None, (
-                f"child cannot be None in {self!r}._build_list({item!r}, {gff_list!r})"
-            )
-            struct_id: int = cast("int", child.data(_VALUE_NODE_ROLE))
-            gff_struct: GFFStruct = gff_list.add(struct_id)
-            self._build_struct(child, gff_struct)
+            child = item.child(i, 0)
+            assert child is not None, f"child cannot be None in {self!r}_build_list({item!r}, {gffList!r})"
+            struct_id = child.data(_VALUE_NODE_ROLE)
+            gffStruct: GFFStruct = gffList.add(struct_id)
+            self._build_struct(child, gffStruct)
 
     def new(self):
         super().new()
         self.model.clear()
         self.model.setColumnCount(1)
 
-        root_node = QStandardItem("[ROOT]")
-        self.apply_palette(root_node, GFFFieldType.Struct)
-        # root_node.setForeground(QBrush(QColor(0x660000)))
-        self.model.appendRow(root_node)
+        rootNode = QStandardItem("[ROOT]")
+        rootNode.setForeground(QBrush(QColor(0x660000)))
+        self.model.appendRow(rootNode)
 
-    def selection_changed(
-        self,
-        selected: QItemSelectionRange,
-    ):
-        for proxy_index in selected.indexes():
-            source_index: QModelIndex = self.proxy_model.mapToSource(proxy_index)
-            tree_item: QStandardItem | None = self.model.itemFromIndex(source_index)
-            assert tree_item is not None
-            self.load_item(tree_item)
+    def selectionChanged(self, selected: QItemSelectionRange):
+        """Updates UI when selection changes in view.
 
-    def load_item(
-        self,
-        item: QStandardItem,
-    ):
-        def set_spinbox(minv: int, maxv: int, item: QStandardItem):
+        Args:
+        ----
+            selected: QItemSelectionRange: The currently selected item range
+
+        Processes selection change:
+            - Gets the proxy index of the selected item
+            - Maps the proxy index to the source index
+            - Gets the item from the source model using the source index
+            - Loads the selected item into the UI.
+        """
+        proxyIndex = selected.indexes()[0]
+        sourceIndex = self.proxyModel.mapToSource(proxyIndex)
+        item = self.model.itemFromIndex(sourceIndex)
+        assert item is not None
+        self.loadItem(item)
+
+    def loadItem(self, item: QListWidgetItem):
+        """Load item into UI widgets.
+
+        Args:
+        ----
+            item: QListWidgetItem: Item to load.
+
+        Load item data into UI widgets:
+            - Set current widget based on field type
+            - Populate spinboxes, line edits, text edits with value
+            - Populate dropdowns and lists
+            - Handle specialized types like vectors and localized strings.
+        """
+        # Loading a value is not an edit (notably for undecodable text bytes).
+        blockers = [QtCore.QSignalBlocker(widget) for widget in (
+            self.ui.intSpin, self.ui.floatSpin, self.ui.lineEdit, self.ui.textEdit,
+            self.ui.labelEdit, self.ui.typeCombo, self.ui.stringrefSpin,
+            self.ui.substringList, self.ui.substringEdit,
+            self.ui.xVec3Spin, self.ui.yVec3Spin, self.ui.zVec3Spin,
+            self.ui.xVec4Spin, self.ui.yVec4Spin, self.ui.zVec4Spin, self.ui.wVec4Spin,
+        )]
+        def set_widget(arg0, arg1, item):
             self.ui.pages.setCurrentWidget(self.ui.intPage)
-            self.ui.intSpin.setRange(minv, maxv)
+            self.ui.intSpin.setRange(arg0, arg1)
             self.ui.intSpin.setValue(item.data(_VALUE_NODE_ROLE))
-
         if item.data(_TYPE_NODE_ROLE) is None:  # Field-less struct (root or in list)
             self.ui.fieldBox.setEnabled(False)
-            set_spinbox(-1, 0xFFFFFFFF, item)
-            return
-        black_page_layout: QLayout | None = self.ui.blankPage.layout()
-        if black_page_layout is not None:
-            while black_page_layout.count():
-                child: QLayoutItem | None = black_page_layout.takeAt(0)
-                if child is None:
-                    continue
-                widget_of_child: QWidget | None = child.widget()
-                if widget_of_child is None:
-                    continue
-                widget_of_child.deleteLater()
 
-        self.ui.fieldBox.setEnabled(True)
-        item_type: GFFFieldType = cast("GFFFieldType", item.data(_TYPE_NODE_ROLE))
-        self.ui.typeCombo.setCurrentText(item_type.name)
-        self.ui.labelEdit.setText(item.data(_LABEL_NODE_ROLE))
+            set_widget(-1, 0xFFFFFFFF, item)
+        else:
+            self.ui.fieldBox.setEnabled(True)
+            self.ui.typeCombo.setCurrentText(item.data(_TYPE_NODE_ROLE).name)
+            self.ui.labelEdit.setText(item.data(_LABEL_NODE_ROLE))
 
-        if item_type == GFFFieldType.Int8:
-            set_spinbox(-0x80, 0x7F, item)
-        elif item_type == GFFFieldType.Int16:
-            set_spinbox(-0x8000, 0x7FFF, item)
-        elif item_type == GFFFieldType.Int32:
-            set_spinbox(-0x80000000, 0x7FFFFFFF, item)
-        elif item_type == GFFFieldType.Int64:
-            set_spinbox(-0x8000000000000000, 0x7FFFFFFFFFFFFFFF, item)
-        elif item_type == GFFFieldType.UInt8:
-            set_spinbox(0, 0xFF, item)
-        elif item_type == GFFFieldType.UInt16:
-            set_spinbox(0, 0xFFFF, item)
-        elif item_type == GFFFieldType.UInt32:
-            set_spinbox(0, 0xFFFFFFFF, item)
-        elif item_type == GFFFieldType.UInt64:
-            set_spinbox(0, 0xFFFFFFFFFFFFFFFF, item)
-        elif item_type in {GFFFieldType.Double, GFFFieldType.Single}:
-            self.ui.pages.setCurrentWidget(self.ui.floatPage)
-            self.ui.floatSpin.setValue(item.data(_VALUE_NODE_ROLE))
-        elif item_type == GFFFieldType.ResRef:
-            self.ui.pages.setCurrentWidget(self.ui.linePage)
-            self.ui.lineEdit.setText(str(item.data(_VALUE_NODE_ROLE)))
-        elif item_type == GFFFieldType.String:
-            self.ui.pages.setCurrentWidget(self.ui.textPage)
-            self.ui.textEdit.setPlainText(str(item.data(_VALUE_NODE_ROLE)))
-        elif item_type == GFFFieldType.Struct:
-            set_spinbox(-1, 0xFFFFFFFF, item)
-        elif item_type == GFFFieldType.List:
-            self.ui.pages.setCurrentWidget(self.ui.blankPage)
-        elif item_type == GFFFieldType.Vector3:
-            self.ui.pages.setCurrentWidget(self.ui.vector3Page)
-            vec3: Vector3 = item.data(_VALUE_NODE_ROLE)
-            self.ui.xVec3Spin.setValue(vec3.x)
-            self.ui.yVec3Spin.setValue(vec3.y)
-            self.ui.zVec3Spin.setValue(vec3.z)
-        elif item_type == GFFFieldType.Vector4:
-            self.ui.pages.setCurrentWidget(self.ui.vector4Page)
-            vec4: Vector4 = item.data(_VALUE_NODE_ROLE)
-            self.ui.xVec4Spin.setValue(vec4.x)
-            self.ui.yVec4Spin.setValue(vec4.y)
-            self.ui.zVec4Spin.setValue(vec4.z)
-            self.ui.wVec4Spin.setValue(vec4.w)
-        elif item_type == GFFFieldType.Binary:
-            binaryData: bytes = item.data(_VALUE_NODE_ROLE)
-            self.ui.pages.setCurrentWidget(self.ui.blankPage)
-            if self.ui.blankPage.layout() is None:
-                layout = QVBoxLayout(self.ui.blankPage)
-                self.ui.blankPage.setLayout(layout)
-            else:
-                layout: QLayout | None = self.ui.blankPage.layout()
-                assert layout is not None, "layout cannot be None"
-                while layout.count():
-                    child: QLayoutItem | None = layout.takeAt(0)
-                    if child is None:
-                        continue
-                    widget_of_child: QWidget | None = child.widget()
-                    if widget_of_child is None:
-                        continue
-                    widget_of_child.deleteLater()
-            hex_data_str = " ".join(f"{b:02X}" for b in binaryData)
-            binary_data_label = QLabel(f"{hex_data_str}")
-            binary_data_label.setWordWrap(True)
-            binary_data_label.setFont(QFont("Courier New", 7))
-            binary_data_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
-            binary_data_label.setMaximumWidth(
-                self.ui.blankPage.width() - 20
-            )  # -20 otherwise the pane grows for some reason.
-            layout.addWidget(binary_data_label)
-            copy_button: QPushButton | None = QPushButton("Copy Binary Data")
-            assert copy_button is not None, "copy_button cannot be None"
-            layout.addWidget(copy_button)
-            copy_button.clicked.connect(
-                lambda: cast("QClipboard", QApplication.clipboard()).setText(hex_data_str)
-            )
-        elif item_type == GFFFieldType.LocalizedString:
-            locstring: LocalizedString = item.data(_VALUE_NODE_ROLE)
-            self.ui.pages.setCurrentWidget(self.ui.substringPage)
-            self.ui.substringEdit.setEnabled(False)
-            self.ui.stringrefSpin.setValue(locstring.stringref)
-            self.ui.substringList.clear()
-            for language, gender, text in locstring:
-                listItem = QListWidgetItem(f"{language.name.title()}, {gender.name.title()}")
-                listItem.setData(_TEXT_SUBSTRING_ROLE, text)
-                listItem.setData(_ID_SUBSTRING_ROLE, LocalizedString.substring_id(language, gender))
-                self.ui.substringList.addItem(listItem)
+            if item.data(_TYPE_NODE_ROLE) in _INTEGER_RANGES:
+                set_widget(*_INTEGER_RANGES[item.data(_TYPE_NODE_ROLE)], item)
+            elif item.data(_TYPE_NODE_ROLE) in {GFFFieldType.Double, GFFFieldType.Single}:
+                self.ui.pages.setCurrentWidget(self.ui.floatPage)
+                self.ui.floatSpin.setValue(item.data(_VALUE_NODE_ROLE))
+            elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.ResRef:
+                self.ui.pages.setCurrentWidget(self.ui.linePage)
+                self.ui.lineEdit.setText(str(item.data(_VALUE_NODE_ROLE)))
+            elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.String:
+                self.ui.pages.setCurrentWidget(self.ui.textPage)
+                self.ui.textEdit.setPlainText(item.data(_VALUE_NODE_ROLE))
+            elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.Struct:
+                set_widget(-1, 0xFFFFFFFF, item)
+            elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.List:
+                self.ui.pages.setCurrentWidget(self.ui.blankPage)
+            elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.Vector3:
+                self.ui.pages.setCurrentWidget(self.ui.vector3Page)
+                vec3 = item.data(_VALUE_NODE_ROLE)
+                self.ui.xVec3Spin.setValue(vec3.x)
+                self.ui.yVec3Spin.setValue(vec3.y)
+                self.ui.zVec3Spin.setValue(vec3.z)
+            elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.Vector4:
+                self.ui.pages.setCurrentWidget(self.ui.vector4Page)
+                vec4 = item.data(_VALUE_NODE_ROLE)
+                self.ui.xVec4Spin.setValue(vec4.x)
+                self.ui.yVec4Spin.setValue(vec4.y)
+                self.ui.zVec4Spin.setValue(vec4.z)
+                self.ui.wVec4Spin.setValue(vec4.w)
+            elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.Binary:
+                self.ui.pages.setCurrentWidget(self.ui.blankPage)
+                ...  # TODO: Why is this here?
+            elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.LocalizedString:
+                locstring: LocalizedString = item.data(_VALUE_NODE_ROLE)
+                self.ui.pages.setCurrentWidget(self.ui.substringPage)
+                self.ui.substringEdit.setEnabled(False)
+                self.ui.stringrefSpin.setValue(locstring.stringref)
+                self.ui.substringList.clear()
+                for language, gender, text in locstring:
+                    if self.ui.substringLangCombo.findData(int(language)) == -1:
+                        self.ui.substringLangCombo.addItem(f"Language {language}", int(language))
+                    item = QListWidgetItem(f"{language.name.title() if isinstance(language, Language) else f'Language {language}'}, {gender.name.title()}")
+                    item.setData(text, _TEXT_SUBSTRING_ROLE)
+                    item.setData(_ID_SUBSTRING_ROLE, LocalizedString.substring_id(language, gender))
+                    self.ui.substringList.addItem(item)
 
-    def update_data(self):
-        selected_indices: list[QModelIndex] = self.ui.treeView.selectedIndexes()
-        if not selected_indices:
+        del blockers
+
+    def updateData(self):
+        """Updates data in the GFF tree model.
+
+        Args:
+        ----
+            self: The class instance
+
+        Updates the selected item's:
+        - Label
+        - Value based on type:
+            - Integer, float, string, vector, etc
+        - Refreshes the item text
+        """
+        if not self.ui.treeView.selectedIndexes():
             return
 
-        proxy_index: QModelIndex = selected_indices[0]
-        source_index: QModelIndex = self.proxy_model.mapToSource(proxy_index)
-        item: QStandardItem | None = self.model.itemFromIndex(source_index)
-        assert item is not None, "item cannot be None"
-        item_type: GFFFieldType = cast("GFFFieldType", item.data(_TYPE_NODE_ROLE))
+        proxyIndex = self.ui.treeView.selectedIndexes()[0]
+        sourceIndex = self.proxyModel.mapToSource(proxyIndex)
+        item = self.model.itemFromIndex(sourceIndex)
 
         item.setData(self.ui.labelEdit.text(), _LABEL_NODE_ROLE)
 
-        if item_type in {
+        if item.data(_TYPE_NODE_ROLE) in {
             GFFFieldType.UInt8,
             GFFFieldType.Int8,
             GFFFieldType.UInt16,
@@ -448,411 +469,390 @@ class GFFEditor(Editor):
             GFFFieldType.Int64,
         }:
             item.setData(self.ui.intSpin.value(), _VALUE_NODE_ROLE)
-        elif item_type in {GFFFieldType.Single, GFFFieldType.Double}:
+        elif item.data(_TYPE_NODE_ROLE) in {GFFFieldType.Single, GFFFieldType.Double}:
             item.setData(self.ui.floatSpin.value(), _VALUE_NODE_ROLE)
-        elif item_type == GFFFieldType.ResRef:
-            item.setData(ResRef(self.ui.lineEdit.text()), _VALUE_NODE_ROLE)
-        elif item_type == GFFFieldType.String:
+        elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.ResRef:
+            if str(item.data(_VALUE_NODE_ROLE)) != self.ui.lineEdit.text():
+                item.setData(ResRef(self.ui.lineEdit.text()), _VALUE_NODE_ROLE)
+        elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.String:
             item.setData(self.ui.textEdit.toPlainText(), _VALUE_NODE_ROLE)
-        elif item_type == GFFFieldType.Vector3:
-            vec3 = Vector3(
-                self.ui.xVec3Spin.value(), self.ui.yVec3Spin.value(), self.ui.zVec3Spin.value()
-            )
+        elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.Vector3:
+            vec3 = Vector3(self.ui.xVec3Spin.value(), self.ui.yVec3Spin.value(), self.ui.zVec3Spin.value())
             item.setData(vec3, _VALUE_NODE_ROLE)
-        elif item_type == GFFFieldType.Vector4:
-            vec4 = Vector4(
-                self.ui.xVec4Spin.value(),
-                self.ui.yVec4Spin.value(),
-                self.ui.zVec4Spin.value(),
-                self.ui.wVec4Spin.value(),
-            )
+        elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.Vector4:
+            vec4 = Vector4(self.ui.xVec4Spin.value(), self.ui.yVec4Spin.value(), self.ui.zVec4Spin.value(), self.ui.wVec4Spin.value())
             item.setData(vec4, _VALUE_NODE_ROLE)
-        elif item_type == GFFFieldType.LocalizedString:
-            value_locstring: LocalizedString = cast("LocalizedString", item.data(_VALUE_NODE_ROLE))
-            value_locstring.stringref = self.ui.stringrefSpin.value()
-        elif item_type == GFFFieldType.Struct or item_type is None:
+        elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.LocalizedString:
+            item.data(_VALUE_NODE_ROLE).stringref = self.ui.stringrefSpin.value()
+        elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.Struct or item.data(_TYPE_NODE_ROLE) is None:
             item.setData(self.ui.intSpin.value(), _VALUE_NODE_ROLE)
-        self.refresh_item_text(item)
+
+        assert item is not None
+        self.refreshItemText(item)
 
     def substringSelected(self):
-        selected_substring_items: list[QListWidgetItem] = self.ui.substringList.selectedItems()
-        if selected_substring_items:
-            for listItem in selected_substring_items:
-                self.ui.substringEdit.setEnabled(True)
-                self.ui.substringEdit.setPlainText(listItem.data(_TEXT_SUBSTRING_ROLE))
+        if len(self.ui.substringList.selectedItems()) > 0:
+            item: QListWidgetItem = self.ui.substringList.selectedItems()[0]
+            self.ui.substringEdit.setEnabled(True)
+            self.ui.substringEdit.setPlainText(item.data(_TEXT_SUBSTRING_ROLE))
         else:
             self.ui.substringEdit.setEnabled(False)
 
-    def substring_edited(self):
-        for item in self.ui.substringList.selectedItems():
-            text: str = self.ui.substringEdit.toPlainText()
-            item.setData(_TEXT_SUBSTRING_ROLE, text)
+    def substringEdited(self):
+        """Edits the selected substring in the list.
 
-            language, gender = LocalizedString.substring_pair(item.data(_ID_SUBSTRING_ROLE))
-            proxy_index: QModelIndex = self.ui.treeView.selectedIndexes()[0]
-            tree_source_index: QModelIndex = self.proxy_model.mapToSource(proxy_index)
-            tree_item: QStandardItem | None = self.model.itemFromIndex(tree_source_index)
-            assert tree_item is not None, "tree_item cannot be None"
-            locstring: LocalizedString = tree_item.data(_VALUE_NODE_ROLE)
-            locstring.set_data(language, gender, text)
+        Args:
+        ----
+            self: The class instance.
 
-    def add_substring(self):
-        language = Language(self.ui.substringLangCombo.currentIndex())
+        Processing Logic:
+        ----------------
+            - Get the selected substring item from the list
+            - Get the edited text from the text edit field
+            - Set the text data on the selected item
+            - Get the selected substring item and language/gender pair
+            - Get the selected localization string item
+            - Set the edited text on the localization string
+        """
+        item: QListWidgetItem = self.ui.substringList.selectedItems()[0]
+        text: str = self.ui.substringEdit.toPlainText()
+        item.setData(text, _TEXT_SUBSTRING_ROLE)
+
+        substringItem: QListWidgetItem = self.ui.substringList.selectedItems()[0]
+        language, gender = LocalizedString.substring_pair(substringItem.data(_ID_SUBSTRING_ROLE))
+        locstringItem: QModelIndex = self.ui.treeView.selectedIndexes()[0]
+        locstring: LocalizedString = locstringItem.data(_VALUE_NODE_ROLE)
+        locstring.set_data(language, gender, text)
+
+    def addSubstring(self):
+        """Adds a substring to the selected localized string.
+
+        Processing Logic:
+        ----------------
+            - Gets the selected language and gender from combo boxes
+            - Generates a unique substring ID based on language and gender
+            - Loops through existing substring list to check for duplicate ID
+            - If no duplicate, adds a new item to the substring list with the ID and empty text
+            - Gets the selected localized string node from the tree view
+            - Sets the empty substring data on the localized string based on the selected language and gender.
+        """
+        language = self.ui.substringLangCombo.currentData()
         gender = Gender(self.ui.substringGenderCombo.currentIndex())
-        substring_id: int = LocalizedString.substring_id(language, gender)
+        substringId = LocalizedString.substring_id(language, gender)
 
         for i in range(self.ui.substringList.count()):
-            item: QListWidgetItem | None = self.ui.substringList.item(i)
-            if item is None:
-                self._logger.warning(f"substringList item at index {i} was None, skipping")
-                continue
-            if item.data(_ID_SUBSTRING_ROLE) == substring_id:
-                self._logger.warning(f"Substring ID '{substring_id}' already exists, exit")
+            item = self.ui.substringList.item(i)
+            if item.data(_ID_SUBSTRING_ROLE) == substringId:
                 return
 
-        item2: QListWidgetItem = QListWidgetItem(f"{language.name.title()}, {gender.name.title()}")
-        item2.setData(_ID_SUBSTRING_ROLE, substring_id)
-        item2.setData(_TEXT_SUBSTRING_ROLE, "")
-        self.ui.substringList.addItem(item2)
+        item = QListWidgetItem(f"{language.name.title() if isinstance(language, Language) else f'Language {language}'}, {gender.name.title()}")
+        item.setData(_ID_SUBSTRING_ROLE, substringId)
+        item.setData(_TEXT_SUBSTRING_ROLE, "")
+        self.ui.substringList.addItem(item)
 
-        proxy_index: QModelIndex = self.ui.treeView.selectedIndexes()[0]
-        tree_source_index: QModelIndex = self.proxy_model.mapToSource(proxy_index)
-        tree_item: QStandardItem | None = self.model.itemFromIndex(tree_source_index)
-        assert tree_item is not None, "tree_item cannot be None"
-        locstring: LocalizedString = tree_item.data(_VALUE_NODE_ROLE)
+        locstringItem = self.ui.treeView.selectedIndexes()[0]
+        locstring: LocalizedString = locstringItem.data(_VALUE_NODE_ROLE)
         locstring.set_data(language, gender, "")
 
-    def remove_substring(self):
-        language = Language(self.ui.substringLangCombo.currentIndex())
-        gender = Gender(self.ui.substringGenderCombo.currentIndex())
-        substring_id: int = LocalizedString.substring_id(language, gender)
-        for i in range(self.ui.substringList.count())[::-1]:
-            item: QListWidgetItem | None = self.ui.substringList.item(i)
-            if item is None:
-                self._logger.warning(f"substringList item at index {i} was None, skipping")
-                continue
-            if item.data(_ID_SUBSTRING_ROLE) == substring_id:
-                self.ui.substringList.takeItem(i)
+    def removeSubstring(self):
+        """Removes a substring from a localized string.
 
-        proxy_index: QModelIndex = self.ui.treeView.selectedIndexes()[0]
-        tree_source_index: QModelIndex = self.proxy_model.mapToSource(proxy_index)
-        tree_item: QStandardItem | None = self.model.itemFromIndex(tree_source_index)
-        assert tree_item is not None, "tree_item cannot be None"
-        locstring: LocalizedString = tree_item.data(_VALUE_NODE_ROLE)
-        locstring.remove(language, gender)
+        Args:
+        ----
+            language: The language of the substring to remove.
+            gender: The gender of the substring to remove.
 
-    def refresh_item_text(self, item: QStandardItem):
-        label: str
-        ftype: GFFFieldType
-        value: Any
-        try:
-            label, ftype, value = (
-                item.data(_LABEL_NODE_ROLE),
-                item.data(_TYPE_NODE_ROLE),
-                item.data(_VALUE_NODE_ROLE),
-            )
-        except RuntimeError:  # wrapped C/C++ object of type QStandardItem has been deleted?
-            return
+        Processing Logic:
+        ----------------
+            - Gets the substring ID from the language and gender indexes
+            - Loops through the substring list backwards and removes any items with a matching ID
+            - Gets the selected localized string from the tree view
+            - Removes the substring from the localized string using the language and gender
+        """
+        locstringItem = self.ui.treeView.selectedIndexes()[0]
+        locstring = locstringItem.data(_VALUE_NODE_ROLE)
+        for item in self.ui.substringList.selectedItems():
+            language, gender = LocalizedString.substring_pair(item.data(_ID_SUBSTRING_ROLE))
+            locstring.remove(language, gender)
+            self.ui.substringList.takeItem(self.ui.substringList.row(item))
+
+    def refreshItemText(self, item: QStandardItem):
+        """Refreshes the text of an item in the tree view.
+
+        Args:
+        ----
+            item: QStandardItem: The item whose text needs to be refreshed.
+
+        Refreshes the text of the item based on its data:
+        - Sets the text based on the item's label, type and value
+        - Sets the foreground color based on the item's type
+        - Updates the item with the refreshed text.
+        """
+        label, ftype, value = item.data(_LABEL_NODE_ROLE), item.data(_TYPE_NODE_ROLE), item.data(_VALUE_NODE_ROLE)
 
         if ftype is None and item.parent() is None:
             text = "[ROOT]"
         elif ftype is None:
-            text = f"{str(item.row()).ljust(16)} {'[Struct]'.ljust(17)} = {value}"
-        elif ftype == GFFFieldType.Struct:
-            text = f"{label.ljust(16)} {'[Struct]'.ljust(17)} = {value}"
-        elif ftype == GFFFieldType.List:
-            text = f"{label.ljust(16)} {'[List]'.ljust(17)} = {item.rowCount()}"
+            text = f'{str(item.row()).ljust(16)} {"[Struct]".ljust(17)} = {value}'
+        elif ftype is GFFFieldType.Struct:
+            text = f'{label.ljust(16)} {"[Struct]".ljust(17)} = {value}'
+        elif ftype is GFFFieldType.List:
+            text = f'{label.ljust(16)} {"[List]".ljust(17)} = {item.rowCount()}'
         else:
-            text = f"{label.ljust(16)} {f'[{ftype.name}]'.ljust(17)} = {value}"
-        self.apply_palette(item, ftype)
+            text = f'{label.ljust(16)} {f"[{ftype.name}]".ljust(17)} = {value}'
 
-        # if ftype == GFFFieldType.Struct or ftype is None:
-        #    item.setForeground(QBrush(QColor(0x660000)))
-        # elif ftype == GFFFieldType.List:
-        #    item.setForeground(QBrush(QColor(0x000088)))
-        # else:
-        #    item.setForeground(QBrush(QColor(0x000000)))
+        if ftype == GFFFieldType.Struct or ftype is None:
+            item.setForeground(QBrush(QColor(0x660000)))
+        elif ftype == GFFFieldType.List:
+            item.setForeground(QBrush(QColor(0x000088)))
+        else:
+            item.setForeground(QBrush(QColor(0x000000)))
 
         item.setText(text)
 
-    def type_changed(
-        self,
-        ftype_enum_value: int,
-    ):
-        ftype = GFFFieldType(ftype_enum_value)
-        proxy_index: QModelIndex = self.ui.treeView.selectedIndexes()[0]
-        source_index: QModelIndex = self.proxy_model.mapToSource(proxy_index)
-        item: QStandardItem | None = self.model.itemFromIndex(source_index)
-        assert item is not None, f"item at src index {source_index.row()} is None"
+    def typeChanged(self, ftypeId: int):
+        """Commit a type and a representable value together, preserving rejected edits."""
+        indexes = self.ui.treeView.selectedIndexes()
+        if not indexes:
+            return
+        item = self.model.itemFromIndex(self.proxyModel.mapToSource(indexes[0]))
+        ftype = GFFFieldType(ftypeId)
+        if ftype == item.data(_TYPE_NODE_ROLE):
+            return
+        try:
+            value = self._convertedValue(ftype, item.data(_VALUE_NODE_ROLE))
+        except (ValueError, OverflowError) as error:
+            QMessageBox.warning(self, "Cannot change field type", str(error))
+            self.loadItem(item)
+            return
+        if item.rowCount() and QMessageBox.question(
+            self, "Remove child fields?", "Changing this field's type will remove its child fields. Continue?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        ) != QMessageBox.Yes:
+            self.loadItem(item)
+            return
+        item.removeRows(0, item.rowCount())
         item.setData(ftype, _TYPE_NODE_ROLE)
+        item.setData(value, _VALUE_NODE_ROLE)
+        item.setData(None, _RAW_NODE_ROLE)
+        item.setData(None, _ORIGINAL_NODE_ROLE)
+        self.loadItem(item)
+        self.refreshItemText(item)
 
-        numeric: bool = isinstance(item.data(_VALUE_NODE_ROLE), (float, int))
+    def _convertedValue(self, ftype, value):
+        """Return a value matching the tree model's representation of the new type."""
+        numeric = isinstance(value, (int, float))
+        if ftype in _INTEGER_RANGES:
+            if not numeric:
+                return 0
+            if isinstance(value, float) and (not math.isfinite(value) or not value.is_integer()):
+                raise ValueError(f"{value!r} is not an integer.")
+            converted = int(value)
+            minimum, maximum = _INTEGER_RANGES[ftype]
+            if not minimum <= converted <= maximum:
+                raise ValueError(f"{value!r} is outside the {ftype.name} range ({minimum} to {maximum}).")
+            return converted
+        if ftype in (GFFFieldType.Single, GFFFieldType.Double):
+            converted = float(value) if numeric else 0.0
+            if not math.isfinite(converted):
+                raise ValueError("Choose a finite numeric value before changing its type.")
+            if ftype == GFFFieldType.Single:
+                try:
+                    converted = struct.unpack("<f", struct.pack("<f", converted))[0]
+                except (OverflowError, struct.error) as error:
+                    raise ValueError("The value is outside the Single precision range.") from error
+            return converted
+        if ftype == GFFFieldType.Struct:
+            return 0  # The value role holds the struct ID; fields are child nodes.
+        if ftype == GFFFieldType.List:
+            return None  # List elements are child nodes, not a value-role object.
+        if ftype == GFFFieldType.String:
+            return ""
+        if ftype == GFFFieldType.LocalizedString:
+            return LocalizedString.from_invalid()
+        if ftype == GFFFieldType.ResRef:
+            return ResRef.from_blank()
+        if ftype == GFFFieldType.Vector3:
+            return Vector3.from_null()
+        if ftype == GFFFieldType.Vector4:
+            return Vector4.from_null()
+        if ftype == GFFFieldType.Binary:
+            return b""
+        raise ValueError(f"Unsupported field type: {ftype!r}.")
 
-        if not numeric and ftype in {
-            GFFFieldType.UInt8,
-            GFFFieldType.Int8,
-            GFFFieldType.UInt16,
-            GFFFieldType.Int16,
-            GFFFieldType.UInt32,
-            GFFFieldType.Int32,
-            GFFFieldType.UInt64,
-            GFFFieldType.Int64,
-            GFFFieldType.Single,
-            GFFFieldType.Double,
-        }:
-            # If the old data does not store a number but the new one does, set the value to 0.
-            item.setData(0, _VALUE_NODE_ROLE)
-        elif ftype == GFFFieldType.String:
-            item.setData("", _VALUE_NODE_ROLE)
-        elif ftype == GFFFieldType.LocalizedString:
-            item.setData(LocalizedString.from_invalid(), _VALUE_NODE_ROLE)
-        elif ftype == GFFFieldType.ResRef:
-            item.setData(ResRef.from_blank(), _VALUE_NODE_ROLE)
-        elif ftype == GFFFieldType.Vector3:
-            item.setData(Vector3.from_null(), _VALUE_NODE_ROLE)
-        elif ftype == GFFFieldType.Vector4:
-            item.setData(Vector4.from_null(), _VALUE_NODE_ROLE)
-        elif ftype == GFFFieldType.Binary:
-            item.setData(b"", _VALUE_NODE_ROLE)
-        elif ftype == GFFFieldType.Struct:
-            item.setData(GFFStruct(), _VALUE_NODE_ROLE)
-        elif ftype == GFFFieldType.List:
-            item.setData(GFFList(), _VALUE_NODE_ROLE)
+    def insertNode(self, parent: QStandardItem, label: str, ftype: GFFFieldType | None, value: Any):
+        """Inserts a new child node under the given parent node.
 
-        assert item is not None
-        self.load_item(item)  # type: ignore[]
-        self.refresh_item_text(item)
+        Args:
+        ----
+            parent: The parent QStandardItem node to insert under
+            label: The label of the new node
+            ftype: The field type of the new node
+            value: The value of the new node
 
-    def insert_node(
-        self,
-        parent: QStandardItem,
-        label: str,
-        ftype: GFFFieldType,
-        value: Any,
-    ) -> QStandardItem:
+        Processing Logic:
+        ----------------
+            1. Creates a new empty QStandardItem
+            2. Sets the label, type and value data roles on the new item
+            3. Appends the new item as a child to the parent node
+            4. Refreshes the text of the new item.
+        """
         item = QStandardItem("")
         item.setData(label, _LABEL_NODE_ROLE)
         item.setData(ftype, _TYPE_NODE_ROLE)
         item.setData(value, _VALUE_NODE_ROLE)
         parent.appendRow(item)
-        self.refresh_item_text(item)
-        return item
+        self.refreshItemText(item)
 
-    def add_node(
-        self,
-        item: QStandardItem,
-    ):
-        def set_spinbox(minv: int, maxv: int, item: QStandardItem):
-            self.ui.pages.setCurrentWidget(self.ui.intPage)
-            self.ui.intSpin.setRange(minv, maxv)
-            self.ui.intSpin.setValue(item.data(_VALUE_NODE_ROLE))
+    def removeNode(self, item: QStandardItem):
+        """Remove a node from the tree model.
 
-        parent_type = item.data(_TYPE_NODE_ROLE)
-        new_value: GFFStruct | int = GFFStruct()
-        new_label = "[New Struct]"
-        if parent_type == GFFFieldType.List:
-            assert isinstance(new_value, GFFStruct), "new_value must be a GFFStruct"
-            self.ui.fieldBox.setEnabled(False)
-            new_value = new_value.struct_id
-            new_label = str(item.rowCount())
-        new_item: QStandardItem = self.insert_node(item, new_label, GFFFieldType.Struct, new_value)
-        set_spinbox(-1, 0xFFFFFFFF, new_item)
+        Args:
+        ----
+            item: The item to remove
 
-    def remove_node(
-        self,
-        item: QStandardItem,
-    ):
-        parent_item: QStandardItem | None = item.parent()
-        if parent_item is None:
-            QMessageBox(
-                QMessageBox.Icon.Critical,
-                tr("Invalid action attempted"),
-                tr("Cannot remove the top-level [ROOT] item."),
-            ).exec()
-            return
-        parent_item.removeRow(item.row())
-        self.refresh_item_text(item)
+        Processing Logic:
+        ----------------
+            - Get the parent item of the item to remove
+            - Remove the item's row from the parent
+            - This removes the item from the model.
+        """
+        item.parent().removeRow(item.row())
 
-    def remove_selected_nodes(self):
-        for proxy_index in self.ui.treeView.selectedIndexes():
-            source_index: QModelIndex = self.proxy_model.mapToSource(proxy_index)
-            item: QStandardItem | None = self.model.itemFromIndex(source_index)
+    def removeSelectedNodes(self):
+        """Removes selected nodes from the tree.
+
+        Args:
+        ----
+            self: The class instance.
+
+        Processing Logic:
+        ----------------
+            - Loops through the selected indexes in the tree view.
+            - Maps each proxy index to its corresponding source index.
+            - Gets the item from the source model using the source index.
+            - Calls removeNode() to remove the item from the model.
+        """
+        for proxyIndex in self.ui.treeView.selectedIndexes():
+            sourceIndex = self.proxyModel.mapToSource(proxyIndex)
+            item = self.model.itemFromIndex(sourceIndex)
             assert item is not None
-            self.remove_node(item)
+            self.removeNode(item)
 
-    def on_context_menu(
-        self,
-        point: QPoint,
-    ):
-        proxy_index: QModelIndex = self.ui.treeView.indexAt(point)
-        source_index: QModelIndex = self.proxy_model.mapToSource(proxy_index)
-        item: QStandardItem | None = self.model.itemFromIndex(source_index)
-        if item is None:
-            return
+    def requestContextMenu(self, point):
+        """Generates context menu for tree view item at given point.
 
-        menu = QMenu(self)
-        nested_type = item.data(_TYPE_NODE_ROLE)
-        if nested_type == GFFFieldType.List:
-            menu.addAction("Add Struct").triggered.connect(lambda: self.add_node(item))
-        elif nested_type in {GFFFieldType.Struct, None}:
-            self._build_context_menu_gff_struct(menu, item)
-        menu.addAction("Remove").triggered.connect(lambda: self.remove_node(item))
-        viewport: QWidget | None = self.ui.treeView.viewport()
-        assert viewport is not None, "Viewport is None"
-        menu.popup(viewport.mapToGlobal(point))
+        Args:
+        ----
+            point: Point in global coordinates
 
-    def _build_context_menu_gff_struct(
-        self,
-        menu: _QMenu,  # pyright: ignore[reportInvalidTypeForm]
-        item: QStandardItem,
-    ):
-        field_actions: list[tuple[str, str, GFFFieldType, object]] = [
-            ("Add UInt8", "New UInt8", GFFFieldType.UInt8, 0),
-            ("Add UInt16", "New UInt16", GFFFieldType.UInt16, 0),
-            ("Add UInt32", "New UInt32", GFFFieldType.UInt32, 0),
-            ("Add UInt64", "New UInt64", GFFFieldType.UInt64, 0),
-            ("Add Int8", "New Int8", GFFFieldType.Int8, 0),
-            ("Add Int16", "New Int16", GFFFieldType.Int16, 0),
-            ("Add Int32", "New Int32", GFFFieldType.Int32, 0),
-            ("Add Int64", "New Int64", GFFFieldType.Int64, 0),
-            ("Add Single", "New Single", GFFFieldType.Single, 0.0),
-            ("Add Double", "New Double", GFFFieldType.Double, 0.0),
-            ("Add ResRef", "New ResRef", GFFFieldType.ResRef, 0),
-            ("Add String", "New String", GFFFieldType.String, 0),
-            (
-                "Add LocalizedString",
-                "New LocalizedString",
-                GFFFieldType.LocalizedString,
-                LocalizedString.from_invalid(),
-            ),
-            ("Add Binary", "New Binary", GFFFieldType.Binary, b""),
-            ("Add Vector3", "New Vector3", GFFFieldType.Vector3, Vector3.from_null()),
-            ("Add Vector4", "New Vector4", GFFFieldType.Vector4, Vector3.from_null()),
-        ]
-        for action_label, node_label, field_type, default_value in field_actions:
-            menu.addAction(action_label).triggered.connect(
-                lambda _=False, n=node_label, t=field_type, v=default_value: self.insert_node(
-                    item, n, t, v
+        Processing Logic:
+        ----------------
+            - Gets proxy and source index for item at point
+            - Gets item from model using source index
+            - Builds context menu with actions depending on item type
+            - Connects actions to methods
+            - Pops up menu at point.
+        """
+        proxyIndex = self.ui.treeView.indexAt(point)
+        sourceIndex = self.proxyModel.mapToSource(proxyIndex)
+        item = self.model.itemFromIndex(sourceIndex)
+
+        if item is not None:
+            menu = QMenu(self)
+
+            if item.data(_TYPE_NODE_ROLE) == GFFFieldType.List:
+                menu.addAction("Add Struct").triggered.connect(lambda: self.insertNode(item, "", None, 0))
+            elif item.data(_TYPE_NODE_ROLE) in [GFFFieldType.Struct, None]:
+                self._build_context_menu_gff_struct(menu, item)
+
+            if item.data(_TYPE_NODE_ROLE) is not None:
+                menu.addAction("Remove").triggered.connect(lambda: self.removeNode(item))
+
+            menu.popup(self.ui.treeView.viewport().mapToGlobal(point))
+
+    def _build_context_menu_gff_struct(self, menu: QMenu, item: QStandardItem):
+        """Create fields with the same model representation used by type conversion."""
+        for ftype in (
+            GFFFieldType.UInt8, GFFFieldType.UInt16, GFFFieldType.UInt32, GFFFieldType.UInt64,
+            GFFFieldType.Int8, GFFFieldType.Int16, GFFFieldType.Int32, GFFFieldType.Int64,
+            GFFFieldType.Single, GFFFieldType.Double, GFFFieldType.ResRef, GFFFieldType.String,
+            GFFFieldType.LocalizedString, GFFFieldType.Binary, GFFFieldType.Vector3, GFFFieldType.Vector4,
+            GFFFieldType.Struct, GFFFieldType.List,
+        ):
+            if ftype == GFFFieldType.Struct:
+                menu.addSeparator()
+            menu.addAction(f"Add {ftype.name}").triggered.connect(
+                lambda checked=False, ftype=ftype: self.insertNode(
+                    item, f"New {ftype.name}"[:16], ftype, self._convertedValue(ftype, None),
                 ),
             )
         menu.addSeparator()
-        menu.addAction("Add Struct").triggered.connect(
-            lambda: self.insert_node(item, "New Struct", GFFFieldType.Struct, GFFStruct())
-        )
-        menu.addAction("Add List").triggered.connect(
-            lambda: self.insert_node(item, "New List", GFFFieldType.List, GFFList())
-        )
-        menu.addSeparator()
 
-    def select_talk_table(self):
-        filepath, filter = QFileDialog.getOpenFileName(
-            self, tr("Select a TLK file"), "", "TalkTable (*.tlk)"
-        )
-        if not filepath:
-            return
-        self._talktable = TalkTable(filepath)
+    def selectTalkTable(self):
+        """Select a TLK file using a file dialog.
 
-    def change_locstring_text(self):
+        Args:
+        ----
+            self: The class instance
+
+        Processing Logic:
+        ----------------
+            - Open a file dialog to select a TLK file
+            - Get the selected file path and filter from the dialog
+            - If a file is selected, load it as a TalkTable and assign to self._talktable.
+        """
+        filepath, filter = QFileDialog.getOpenFileName(self, "Select a TLK file", "", "TalkTable (*.tlk)")
+        if filepath:
+            self._talktable = TalkTable(filepath)
+
+    def changeLocstringText(self):
+        """Changes the text displayed based on the selected string reference.
+
+        Args:
+        ----
+            self: The class instance
+
+        Processing Logic:
+        ----------------
+            - Checks if talktable is not None
+            - Gets the string from talktable based on the selected string reference value
+            - Sets the text edit plain text to the retrieved string
+            - If talktable is None, sets the text edit plain text to empty string.
+        """
         if self._talktable is not None:
             text = self._talktable.string(self.ui.stringrefSpin.value())
             self.ui.tlkTextEdit.setPlainText(text)
         else:
             self.ui.tlkTextEdit.setPlainText("")
 
-    def adjust_color(
-        self,
-        base_color: QColor,
-        hue_shift: int = 0,
-        saturation_factor: float = 1.0,
-        value_factor: float = 1.0,
-    ) -> QColor:
-        color: QColor = base_color if isinstance(base_color, QColor) else QColor(base_color)
-        h, s, v, a = color.getHsv()
-
-        # Calculate new HSV values
-        h = ((h or 0) + hue_shift) % 360
-        s = min(max(int((s or 0) * saturation_factor), 0), 255)
-        v = min(max(int((v or 0) * value_factor), 0), 255)
-
-        # Ensure HSV values are within valid ranges
-        if h < 0 or h > 359:  # noqa: PLR2004
-            h = max(0, min(h, 359))
-        if s < 0 or s > 255:  # noqa: PLR2004
-            s = max(0, min(s, 255))
-        if v < 0 or v > 255:  # noqa: PLR2004
-            v = max(0, min(v, 255))
-
-        color.setHsv(h, s, v, a or 255)
-        return color
-
-    def apply_palette(
-        self,
-        item: QStandardItem,
-        ftype: GFFFieldType,
-    ):
-        palette: QPalette = self.palette()
-        # number_base_color = palette.highlight().color()
-        field_type_colors: dict[GFFFieldType, QColor] = {
-            # GFFFieldType.UInt8: self.adjustColor(number_base_color, saturation_factor=1.0, value_factor=1.0),
-            # GFFFieldType.Int8: self.adjustColor(number_base_color, saturation_factor=0.8, value_factor=0.9),
-            # GFFFieldType.UInt16: self.adjustColor(number_base_color, hue_shift=15, saturation_factor=1.0, value_factor=1.0),
-            # GFFFieldType.Int16: self.adjustColor(number_base_color, hue_shift=15, saturation_factor=0.8, value_factor=0.9),
-            # GFFFieldType.UInt32: self.adjustColor(number_base_color, hue_shift=30, saturation_factor=1.0, value_factor=1.2),
-            # GFFFieldType.Int32: self.adjustColor(number_base_color, hue_shift=30, saturation_factor=0.9, value_factor=1.1),
-            # GFFFieldType.UInt64: self.adjustColor(number_base_color, hue_shift=45, saturation_factor=1.0, value_factor=1.0),
-            # GFFFieldType.Int64: self.adjustColor(number_base_color, hue_shift=45, saturation_factor=0.8, value_factor=0.9),
-            # GFFFieldType.Single: self.adjustColor(number_base_color, hue_shift=60, saturation_factor=1.0, value_factor=1.0),
-            # GFFFieldType.Double: self.adjustColor(number_base_color, hue_shift=60, saturation_factor=0.8, value_factor=0.9),
-            # GFFFieldType.ResRef: palette.windowText().color(),
-            # GFFFieldType.String: palette.text().color(),
-            # GFFFieldType.LocalizedString: palette.buttonText().color(),
-            # GFFFieldType.Vector3: self.adjustColor(palette.buttonText().color(), hue_shift=90, saturation_factor=0.8, value_factor=1.1),
-            # GFFFieldType.Vector4: self.adjustColor(palette.buttonText().color(), hue_shift=90, saturation_factor=0.8, value_factor=1.3),
-            GFFFieldType.Struct: QColor("darkGreen"),
-            GFFFieldType.List: self.adjust_color(
-                palette.highlight().color(), hue_shift=120, saturation_factor=0.8, value_factor=1.1
-            ),
-            # GFFFieldType.Binary: palette.midlight().color(),
-        }
-        if ftype in field_type_colors:
-            item.setForeground(QBrush(field_type_colors[ftype]))
-
 
 class GFFSortFilterProxyModel(QSortFilterProxyModel):
-    def __init__(
-        self,
-        parent: QWidget,
-    ):
+    def __init__(self, parent: QWidget):
         super().__init__(parent)
 
-    def lessThan(
-        self,
-        left: QModelIndex,
-        right: QModelIndex,
-    ) -> bool:
-        source_model: QAbstractItemModel | None = self.sourceModel()
-        assert isinstance(source_model, QStandardItemModel), (
-            f"Source model is not a QStandardItemModel, was: {type(source_model).__name__}"
-        )
-        left_item: QStandardItem | None = source_model.itemFromIndex(left)
-        right_item: QStandardItem | None = source_model.itemFromIndex(right)
-        assert left_item is not None, f"Left item at index {left.row()} is None"
-        assert right_item is not None, f"Right item at index {right.row()} is None"
-        left_text: str = left_item.data(_LABEL_NODE_ROLE) or str(left_item.data(_VALUE_NODE_ROLE))
-        right_text: str = right_item.data(_LABEL_NODE_ROLE) or str(
-            right_item.data(_VALUE_NODE_ROLE)
-        )
+    def lessThan(self, left: QModelIndex, right: QModelIndex) -> bool:
+        """Compares two model indexes and returns whether the left is less than the right.
 
-        if left_text.isdigit() and right_text.isdigit():
-            left_int = int(left_text)
-            right_int = int(right_text)
-            return left_int < right_int
-        return left_text < right_text
+        Args:
+        ----
+            left: {QModelIndex}: The left model index to compare
+            right: {QModelIndex}: The right model index to compare
 
+        Processing Logic:
+        ----------------
+            - Extract text from each index using _LABEL_NODE_ROLE and _VALUE_NODE_ROLE roles
+            - If both texts are digits, convert to ints and compare numerically
+            - Otherwise compare strings alphabetically.
+        """
+        leftText: str = self.sourceModel().itemFromIndex(left).data(_LABEL_NODE_ROLE)
+        rightText: str = self.sourceModel().itemFromIndex(right).data(_LABEL_NODE_ROLE)
 
-if __name__ == "__main__":
-    import sys
+        leftText = leftText or str(self.sourceModel().itemFromIndex(left).data(_VALUE_NODE_ROLE))
+        rightText = rightText or str(self.sourceModel().itemFromIndex(right).data(_VALUE_NODE_ROLE))
 
-    from toolset.gui.editors.standalone import launch_editor_cli
-
-    sys.exit(launch_editor_cli("gff"))
+        if leftText.isdigit() and rightText.isdigit():
+            leftInt = int(leftText)
+            rightInt = int(rightText)
+            return leftInt < rightInt
+        return leftText < rightText

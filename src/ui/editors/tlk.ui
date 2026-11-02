@@ -31,7 +31,7 @@
             </property>
             <layout class="QHBoxLayout" name="horizontalLayout_2">
              <item>
-              <widget class="QLineEdit" name="searchEdit" />
+              <widget class="QLineEdit" name="searchEdit"/>
              </item>
              <item>
               <widget class="QPushButton" name="searchButton">
@@ -50,14 +50,7 @@
             </property>
             <layout class="QHBoxLayout" name="horizontalLayout_4">
              <item>
-              <widget class="QSpinBox" name="jumpSpinbox">
-               <property name="minimum">
-                <number>-2147483648</number>
-               </property>
-               <property name="maximum">
-                <number>2147483647</number>
-               </property>
-              </widget>
+              <widget class="QSpinBox" name="jumpSpinbox"/>
              </item>
              <item>
               <widget class="QPushButton" name="jumpButton">
@@ -72,7 +65,7 @@
          </layout>
         </item>
         <item>
-         <widget class="RobustTableView" name="talkTable">
+         <widget class="QTableView" name="talkTable">
           <property name="editTriggers">
            <set>QAbstractItemView::NoEditTriggers</set>
           </property>
@@ -95,7 +88,7 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="layoutWidget1">
+      <widget class="QWidget" name="layoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
          <widget class="QPlainTextEdit" name="textEdit">
@@ -150,32 +143,32 @@
     <property name="title">
      <string>Tools</string>
     </property>
-    <addaction name="actionGoTo" />
-    <addaction name="actionFind" />
-    <addaction name="actionInsert" />
+    <addaction name="actionGoTo"/>
+    <addaction name="actionFind"/>
+    <addaction name="actionInsert"/>
    </widget>
-   <widget class="QMenu" name="menuFile">
+   <widget class="QMenu" name="menuFIle">
     <property name="title">
      <string>File</string>
     </property>
-    <addaction name="actionNew" />
-    <addaction name="actionOpen" />
-    <addaction name="actionSave" />
-    <addaction name="actionSaveAs" />
-    <addaction name="separator" />
-    <addaction name="actionRevert" />
-    <addaction name="separator" />
-    <addaction name="actionClose" />
+    <addaction name="actionNew"/>
+    <addaction name="actionOpen"/>
+    <addaction name="actionSave"/>
+    <addaction name="actionSaveAs"/>
+    <addaction name="separator"/>
+    <addaction name="actionRevert"/>
+    <addaction name="separator"/>
+    <addaction name="actionClose"/>
    </widget>
    <widget class="QMenu" name="menuLanguage">
     <property name="title">
      <string>Language</string>
     </property>
-    <addaction name="actionAuto_detect_slower" />
+    <addaction name="actionAuto_detect_slower"/>
    </widget>
-   <addaction name="menuFile" />
-   <addaction name="menuView" />
-   <addaction name="menuLanguage" />
+   <addaction name="menuFIle"/>
+   <addaction name="menuView"/>
+   <addaction name="menuLanguage"/>
   </widget>
   <action name="actionGoTo">
    <property name="text">
@@ -228,13 +221,6 @@
    </property>
   </action>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>RobustTableView</class>
-   <extends>QTableView</extends>
-   <header location="global">utility.gui.qt.widgets.itemviews.tableview</header>
-  </customwidget>
- </customwidgets>
- <resources />
- <connections />
+ <resources/>
+ <connections/>
 </ui>

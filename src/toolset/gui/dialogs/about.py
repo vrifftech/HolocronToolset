@@ -1,24 +1,9 @@
-"""About dialog: toolset name, version, and credits from LOCAL_PROGRAM_INFO."""
-
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-from qtpy import QtCore
-from qtpy.QtWidgets import QDialog
-
-from toolset.config import LOCAL_PROGRAM_INFO
-
-if TYPE_CHECKING:
-    from qtpy.QtGui import QShowEvent
-    from qtpy.QtWidgets import QWidget
+from PyQt5.QtWidgets import QDialog, QWidget
+from toolset.config import PROGRAM_VERSION_LABEL
 
 
 class About(QDialog):
-    def __init__(
-        self,
-        parent: QWidget,
-    ):
+    def __init__(self, parent: QWidget):
         """Initializes the About dialog box.
 
         Args:
@@ -27,36 +12,16 @@ class About(QDialog):
 
         Processing Logic:
         ----------------
-            - Sets up the UI from the about.py UI file
-            - Connects the closeButton clicked signal to close the dialog
-            - Replaces the version placeholder in the about text with the actual version.
+        - Sets up the UI from the about.py UI file
+        - Connects the closeButton clicked signal to close the dialog
+        - Replaces the version placeholder in the about text with the actual version.
         """
         super().__init__(parent)
-        self.setWindowFlags(
-            QtCore.Qt.WindowType.Dialog  # pyright: ignore[reportArgumentType]
-            | QtCore.Qt.WindowType.WindowCloseButtonHint
-            | QtCore.Qt.WindowType.WindowStaysOnTopHint
-            & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint
-            & ~QtCore.Qt.WindowType.WindowMinMaxButtonsHint,
-        )
 
-        from toolset.uic.qtpy.dialogs.about import Ui_Dialog
-
-        self.ui = Ui_Dialog()
+        from toolset.uic.dialogs import about
+        self.ui = about.Ui_Dialog()
         self.ui.setupUi(self)
 
-        # Setup event filter to prevent scroll wheel interaction with controls
-        from toolset.gui.common.filters import NoScrollEventFilter
+        self.ui.closeButton.clicked.connect(self.close)
 
-        self._no_scroll_filter = NoScrollEventFilter(self)
-        self._no_scroll_filter.setup_filter(parent_widget=self)
-
-        # QPushButton.clicked emits a bool; QDialog.close takes no args.
-        self.ui.closeButton.clicked.connect(lambda *_: self.close())
-
-        self.ui.aboutLabel.setText(
-            self.ui.aboutLabel.text().replace("X.X.X", LOCAL_PROGRAM_INFO["currentVersion"])
-        )
-
-    def showEvent(self, event: QShowEvent):
-        self.setFixedSize(self.size())
+        self.ui.aboutLabel.setText(self.ui.aboutLabel.text().replace("X.X.X", PROGRAM_VERSION_LABEL))

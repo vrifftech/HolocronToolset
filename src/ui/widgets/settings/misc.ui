@@ -37,63 +37,10 @@
         </widget>
        </item>
        <item>
-        <widget class="QCheckBox" name="useBetaChannel">
-         <property name="text">
-          <string>Check for beta updates and take me to their download link when they&apos;re available.</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="hBoxLayoutForSubOption">
-         <property name="leftMargin">
-          <number>20</number>
-         </property>
-         <item>
-          <widget class="QCheckBox" name="alsoCheckReleaseVersion">
-           <property name="text">
-            <string>Also check release version if it is newer than beta version.</string>
-           </property>
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item>
         <widget class="QCheckBox" name="mergeRimCheck">
          <property name="text">
-          <string>Merge secondary ERF/RIM's in the Modules tab of the Main Window (i.e. '_s.rim' and '_dlg.erf').</string>
+          <string>Merge RIM files in the Modules tab of the Main Window.</string>
          </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="attemptKeepOldGFFFields">
-         <property name="text">
-          <string>Attempts to keep any pre-existing GFF fields when saving the editor. Required for save editing.</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QComboBox" name="moduleSortOptionComboBox">
-            <property name="editable">
-                <bool>false</bool>
-            </property>
-            <item>
-                <property name="text">
-                    <string>Sort by filename</string>
-                </property>
-            </item>
-            <item>
-                <property name="text">
-                    <string>Sort by humanized area name</string>
-                </property>
-            </item>
-            <item>
-                <property name="text">
-                    <string>Sort by area name</string>
-                </property>
-            </item>
         </widget>
        </item>
        <item>
@@ -121,13 +68,6 @@
         <widget class="QCheckBox" name="showPreviewUTDCheck">
          <property name="text">
           <string>Show 3D Preview in UTD Editor</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="profileToolset">
-         <property name="text">
-          <string>Profile various subroutines of the toolset.</string>
          </property>
         </widget>
        </item>

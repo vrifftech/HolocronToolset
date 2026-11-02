@@ -1,74 +1,48 @@
-"""GIT trigger instance editor (geometry uses editor geometry mode)."""
-
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-from qtpy.QtCore import Qt
-from qtpy.QtWidgets import QDialog, QMessageBox
-
+from pykotor.common.misc import ResRef
 from pykotor.resource.generics.git import GITModuleLink, GITTrigger
+from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtWidgets import QDialog, QWidget
 from toolset.data.installation import HTInstallation
-from toolset.gui.common.localization import translate as tr
-from toolset.gui.dialogs.instance._util import parse_resref_field
-
-if TYPE_CHECKING:
-    from qtpy.QtWidgets import QWidget
 
 
 class TriggerDialog(QDialog):
-    def __init__(self, parent: QWidget | None, instance: GITTrigger, installation: HTInstallation):
+    def __init__(self, parent: QWidget, trigger: GITTrigger, installation: HTInstallation):
         super().__init__(parent)
-        self._instance: GITTrigger = instance
-        self._installation: HTInstallation = installation
 
-        from toolset.uic.qtpy.dialogs.instance.trigger import Ui_Dialog
+        from toolset.uic.dialogs.instance.trigger import Ui_Dialog
 
-        self.ui: Ui_Dialog = Ui_Dialog()
+        self.ui = Ui_Dialog()
         self.ui.setupUi(self)
-        self._populate_link_combo()
-        self._load_from_instance()
 
-    def _populate_link_combo(self) -> None:
-        combo = self.ui.linkedToFlagsCombo
-        combo.clear()
-        combo.addItem("No link", int(GITModuleLink.NoLink))
-        combo.addItem("To door", int(GITModuleLink.ToDoor))
-        combo.addItem("To waypoint", int(GITModuleLink.ToWaypoint))
+        self.ui.transNameEdit.setInstallation(installation)
 
-    def _load_from_instance(self) -> None:
-        self.ui.resrefEdit.setText(str(self._instance.resref))
-        self.ui.xPosSpin.setValue(self._instance.position.x)
-        self.ui.yPosSpin.setValue(self._instance.position.y)
-        self.ui.zPosSpin.setValue(self._instance.position.z)
-        self.ui.tagEdit.setText(self._instance.tag)
-        self.ui.linkedToEdit.setText(self._instance.linked_to)
-        v = int(self._instance.linked_to_flags)
-        idx = self.ui.linkedToFlagsCombo.findData(v, Qt.ItemDataRole.UserRole)
-        self.ui.linkedToFlagsCombo.setCurrentIndex(max(0, idx))
-        self.ui.linkedToModuleEdit.setText(str(self._instance.linked_to_module))
-        self.ui.transitionStrRefSpin.setValue(self._instance.transition_destination.stringref)
+        self.setWindowTitle("Edit Trigger")
+        self.setWindowIcon(QIcon(QPixmap(":/images/icons/k1/trigger.png")))
 
-    def accept(self) -> None:
-        resref, err = parse_resref_field(self.ui.resrefEdit.text())
-        if err:
-            QMessageBox.critical(self, tr("Invalid resref"), err)
-            return
-        assert resref is not None
-        mod_rr, mod_err = parse_resref_field(self.ui.linkedToModuleEdit.text())
-        if mod_err:
-            QMessageBox.critical(self, tr("Invalid module resref"), mod_err)
-            return
-        assert mod_rr is not None
+        self.ui.resrefEdit.setText(str(trigger.resref))
+        self.ui.tagEdit.setText(trigger.tag)
+        self.ui.xPosSpin.setValue(trigger.position.x)
+        self.ui.yPosSpin.setValue(trigger.position.y)
+        self.ui.zPosSpin.setValue(trigger.position.z)
+        self.ui.linkToTagEdit.setText(trigger.linked_to)
+        self.ui.linkToModuleEdit.setText(str(trigger.linked_to_module))
+        self.ui.noTransCheck.setChecked(trigger.linked_to_flags == 0)
+        self.ui.toDoorCheck.setChecked(trigger.linked_to_flags == 1)
+        self.ui.toWaypointCheck.setChecked(trigger.linked_to_flags == 2)
+        self.ui.transNameEdit.setLocstring(trigger.transition_destination)
 
-        self._instance.resref = resref
-        self._instance.position.x = self.ui.xPosSpin.value()
-        self._instance.position.y = self.ui.yPosSpin.value()
-        self._instance.position.z = self.ui.zPosSpin.value()
-        self._instance.tag = self.ui.tagEdit.text().strip()
-        self._instance.linked_to = self.ui.linkedToEdit.text().strip()
-        raw_flags = self.ui.linkedToFlagsCombo.currentData(Qt.ItemDataRole.UserRole)
-        self._instance.linked_to_flags = GITModuleLink(int(raw_flags))
-        self._instance.linked_to_module = mod_rr
-        self._instance.transition_destination.stringref = self.ui.transitionStrRefSpin.value()
+        self.trigger: GITTrigger = trigger
+
+    def accept(self):
         super().accept()
+        self.trigger.resref = ResRef(self.ui.resrefEdit.text())
+        self.trigger.tag = self.ui.tagEdit.text()
+        self.trigger.position.x = self.ui.xPosSpin.value()
+        self.trigger.position.y = self.ui.yPosSpin.value()
+        self.trigger.position.z = self.ui.zPosSpin.value()
+        self.trigger.linked_to = self.ui.linkToTagEdit.text()
+        self.trigger.linked_to_module = ResRef(self.ui.linkToModuleEdit.text())
+        self.trigger.linked_to_flags = GITModuleLink(
+            0 if self.ui.noTransCheck.isChecked() else 1 if self.ui.toDoorCheck.isChecked() else 2,
+        )
+        self.trigger.transition_destination = self.ui.transNameEdit.locstring()

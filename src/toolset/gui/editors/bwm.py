@@ -1,40 +1,29 @@
-"""BWM (walkmesh) editor: face list, materials, and 2D camera for module designer."""
-
 from __future__ import annotations
 
+from toolset.data.settings import settings_signals
+from toolset.gui.widgets.settings.git import GITSettings
+from toolset.gui.widgets.settings.module_designer import ModuleDesignerSettings
+from pykotor.common.misc import Color
+
+import struct
 from typing import TYPE_CHECKING
 
-from qtpy.QtCore import Qt
-from qtpy.QtWidgets import QListWidgetItem
-
-from pykotor.resource.formats.bwm import (  # pyright: ignore[reportMissingImports]
-    read_bwm,
-    write_bwm,
-)
-from pykotor.resource.type import ResourceType  # pyright: ignore[reportMissingImports]
-from toolset.gui.common.interaction.camera import (
-    handle_standard_2d_camera_movement,
-)
-from toolset.gui.common.viewport_2d_nav import Viewport2DNavigationHelper, aabb_from_points
-from toolset.gui.common.walkmesh_materials import (
-    get_walkmesh_material_colors,
-    populate_material_list_widget,
-)
+from pykotor.common.geometry import SurfaceMaterial, Vector2, Vector3
+from pykotor.resource.formats.bwm import BWM, BWMFace, read_bwm, write_bwm
+from pykotor.resource.type import ResourceType
+from PyQt5 import QtCore
+from PyQt5.QtGui import QColor, QIcon, QImage, QPixmap
+from PyQt5.QtWidgets import QListWidgetItem, QShortcut, QWidget
 from toolset.gui.editor import Editor
-from toolset.gui.widgets.settings.widgets.module_designer import ModuleDesignerSettings
+from utility.error_handling import assert_with_variable_trace
 
 if TYPE_CHECKING:
     import os
 
-    from qtpy.QtGui import QColor
-    from qtpy.QtWidgets import QWidget
-
-    from pykotor.resource.formats.bwm import BWM, BWMFace  # pyright: ignore[reportMissingImports]
     from toolset.data.installation import HTInstallation
-    from utility.common.geometry import SurfaceMaterial, Vector2, Vector3
 
-_TRANS_FACE_ROLE = Qt.ItemDataRole.UserRole + 1  # type: ignore[attr-defined]
-_TRANS_EDGE_ROLE = Qt.ItemDataRole.UserRole + 2  # type: ignore[attr-defined]
+_TRANS_FACE_ROLE = QtCore.Qt.UserRole + 1  # type: ignore[attr-defined]
+_TRANS_EDGE_ROLE = QtCore.Qt.UserRole + 2  # type: ignore[attr-defined]
 
 
 class BWMEditor(Editor):
@@ -57,58 +46,55 @@ class BWMEditor(Editor):
             - Creates new empty walkmesh.
         """
         supported = [ResourceType.WOK, ResourceType.DWK, ResourceType.PWK]
-        self._bwm: BWM | None = None
         super().__init__(parent, "Walkmesh Painter", "walkmesh", supported, supported, installation)
 
-        from toolset.uic.qtpy.editors.bwm import Ui_MainWindow
+        from toolset.uic.editors.bwm import Ui_MainWindow
 
-        self.ui: Ui_MainWindow = Ui_MainWindow()
+        self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self._setupMenus()
+        self._setupSignals()
 
-        self._setup_menus()
-        self._add_help_action()
-        self._setup_signals()
+        self._bwm: BWM | None = None
 
-        self.material_colors: dict[SurfaceMaterial, QColor] = get_walkmesh_material_colors()
-        self.ui.renderArea.material_colors = self.material_colors
-        self.ui.renderArea.show_room_boundaries = True
-        self.ui.renderArea.show_grid = False
-        self._nav_helper = Viewport2DNavigationHelper(
-            self.ui.renderArea,
-            get_content_bounds=self._content_bounds,
-            settings=ModuleDesignerSettings(),
-        )
-        self.rebuild_materials()
+        self.materialColors: dict[SurfaceMaterial, QColor] = {
+            SurfaceMaterial.UNDEFINED: QColor(0xF45086),
+            SurfaceMaterial.OBSCURING: QColor(0x555555),
+            SurfaceMaterial.DIRT: QColor(0x800000),
+            SurfaceMaterial.GRASS: QColor(0x33CC33),
+            SurfaceMaterial.STONE: QColor(0x808080),
+            SurfaceMaterial.WOOD: QColor(0x5E260C),
+            SurfaceMaterial.WATER: QColor(0x0066FF),
+            SurfaceMaterial.NON_WALK: QColor(0xFF00FF),
+            SurfaceMaterial.TRANSPARENT: QColor(0xB3FFFF),
+            SurfaceMaterial.CARPET: QColor(0xFFFF00),
+            SurfaceMaterial.METAL: QColor(0x4D4D4D),
+            SurfaceMaterial.PUDDLES: QColor(0x00FFAA),
+            SurfaceMaterial.SWAMP: QColor(0x00995C),
+            SurfaceMaterial.MUD: QColor(0xCC6600),
+            SurfaceMaterial.LEAVES: QColor(0x009933),
+            SurfaceMaterial.LAVA: QColor(0xFF944D),
+            SurfaceMaterial.BOTTOMLESS_PIT: QColor(0xE6E6E6),
+            SurfaceMaterial.DEEP_WATER: QColor(0x9999FF),
+            SurfaceMaterial.DOOR: QColor(0xFFB3B3),
+            SurfaceMaterial.NON_WALK_GRASS: QColor(0xB3FFB3),
+            SurfaceMaterial.TRIGGER: QColor(0x4D0033),
+        }
+        self.ui.renderArea.materialColors = self.materialColors
+        self.rebuildMaterials()
 
+        settings_signals.changed.connect(self.reloadSettings)
+        self.reloadSettings()
         self.new()
 
-    def _setup_signals(self) -> None:
-        self.ui.renderArea.sig_mouse_moved.connect(self.on_mouse_moved)
-        self.ui.renderArea.sig_mouse_scrolled.connect(self.on_mouse_scrolled)
-        self.ui.renderArea.sig_key_pressed.connect(self.on_key_pressed)
-        self.ui.actionShowRoomBoundaries.toggled.connect(
-            lambda value: setattr(self.ui.renderArea, "show_room_boundaries", value)
-        )
-        self.ui.actionShowRoomBoundaries.toggled.connect(lambda _: self.ui.renderArea.update())
-        self.ui.actionShowGrid.toggled.connect(
-            lambda value: setattr(self.ui.renderArea, "show_grid", value)
-        )
-        self.ui.actionShowGrid.toggled.connect(lambda _: self.ui.renderArea.update())
+    def _setupSignals(self):
+        self.ui.renderArea.mouseMoved.connect(self.onMouseMoved)
+        self.ui.renderArea.mouseScrolled.connect(self.onMouseScrolled)
 
-    def _content_bounds(self):
-        if self._bwm is None:
-            return None
-        return aabb_from_points(
-            (vertex.x, vertex.y)
-            for face in self._bwm.faces
-            for vertex in (face.v1, face.v2, face.v3)
-        )
+        QShortcut("+", self).activated.connect(lambda: self.ui.renderArea.camera.setZoom(2))
+        QShortcut("-", self).activated.connect(lambda: self.ui.renderArea.camera.setZoom(-2))
 
-    def frame_all(self) -> None:
-        if not self._nav_helper.frame_all():
-            self.ui.renderArea.center_camera()
-
-    def rebuild_materials(self):
+    def rebuildMaterials(self):
         """Rebuild the material list.
 
         Processing Logic:
@@ -120,15 +106,17 @@ class BWMEditor(Editor):
             - Create list item with icon and text
             - Add item to material list.
         """
-        populate_material_list_widget(self.ui.materialList, self.material_colors)
+        self.ui.materialList.clear()
+        for material in self.materialColors:
+            color: QColor = self.materialColors[material]
+            image = QImage(struct.pack("BBB", color.red(), color.green(), color.blue()) * 16 * 16, 16, 16, QImage.Format_RGB888)
+            icon = QIcon(QPixmap(image))
+            text = material.name.replace("_", " ").title()
+            item = QListWidgetItem(icon, text)
+            item.setData(QtCore.Qt.UserRole, material)  # type: ignore[attr-defined]
+            self.ui.materialList.addItem(item)
 
-    def load(
-        self,
-        filepath: os.PathLike | str,
-        resref: str,
-        restype: ResourceType,
-        data: bytes,
-    ):
+    def load(self, filepath: os.PathLike | str, resref: str, restype: ResourceType, data: bytes):
         """Loads a resource into the editor.
 
         Args:
@@ -148,9 +136,9 @@ class BWMEditor(Editor):
         super().load(filepath, resref, restype, data)
 
         self._bwm = read_bwm(data)
-        self.ui.renderArea.set_walkmeshes([self._bwm])
+        self.ui.renderArea.setWalkmeshes([self._bwm])
 
-        def add_trans_item(face: BWMFace, edge: int, transition: int | None):
+        def addTransItem(face, edge, transition):
             if transition is not None:
                 item = QListWidgetItem(f"Transition to: {transition}")
                 item.setData(_TRANS_FACE_ROLE, face)
@@ -159,17 +147,20 @@ class BWMEditor(Editor):
 
         self.ui.transList.clear()
         for face in self._bwm.faces:
-            add_trans_item(face, 1, face.trans1)
-            add_trans_item(face, 2, face.trans2)
-            add_trans_item(face, 3, face.trans3)
+            addTransItem(face, 1, face.trans1)
+            addTransItem(face, 2, face.trans2)
+            addTransItem(face, 3, face.trans3)
 
     def build(self) -> tuple[bytes, bytes]:
-        assert self._bwm is not None
         data = bytearray()
+        assert self._bwm is not None, assert_with_variable_trace(self._bwm is not None)
         write_bwm(self._bwm, data)
         return bytes(data), b""
 
-    def on_mouse_moved(self, screen: Vector2, delta: Vector2, buttons: set[int], keys: set[int]):
+    def new(self):
+        super().new()
+
+    def onMouseMoved(self, screen: Vector2, delta: Vector2, buttons: set[int], keys: set[int]):
         """Handles mouse movement events in the viewer.
 
         Args:
@@ -186,49 +177,36 @@ class BWMEditor(Editor):
             - Changes face material if left button pressed
             - Displays coordinates, face index in status bar.
         """
-        world: Vector3 = self.ui.renderArea.to_world_coords(screen.x, screen.y)
-        world_data: Vector2 = self.ui.renderArea.to_world_delta(delta.x, delta.y)
-        assert self._bwm is not None
+        world: Vector3 = self.ui.renderArea.toWorldCoords(screen.x, screen.y)
+        worldData: Vector2 = self.ui.renderArea.toWorldDelta(delta.x, delta.y)
         face: BWMFace | None = self._bwm.faceAt(world.x, world.y)
 
-        handled_cam = handle_standard_2d_camera_movement(
-            self.ui.renderArea,
-            screen,
-            delta,
-            world_data,
-            buttons,
-            keys,
-            settings=ModuleDesignerSettings(),
-        )
+        if QtCore.Qt.LeftButton in buttons and QtCore.Qt.Key_Control in keys:  # type: ignore[attr-defined]
+            self.ui.renderArea.camera.nudgePosition(-worldData.x, -worldData.y)
+        elif QtCore.Qt.MiddleButton in buttons and QtCore.Qt.Key_Control in keys:  # type: ignore[attr-defined]
+            self.ui.renderArea.camera.nudgeRotation(delta.x * ModuleDesignerSettings().rotateCameraSensitivity2d / 5000)
+        elif QtCore.Qt.LeftButton in buttons:  # type: ignore[attr-defined]
+            if face is not None:
+                self.changeFaceMaterial(face)
 
-        # Paint with left-drag unless camera movement consumed the input.
-        if not handled_cam and Qt.MouseButton.LeftButton in buttons and face is not None:  # type: ignore[attr-defined]
-            self.change_face_material(face)
+        coordsText = f"x: {world.x:.2f}, {world.y:.2f}"
+        faceText = f', face: {"None" if face is None else self._bwm.faces.index(face)}'
 
-        coords_text = f"x: {world.x:.2f}, {world.y:.2f}"
-        face_text = f", face: {'None' if face is None else self._bwm.faces.index(face)}"
-
-        screen = self.ui.renderArea.to_render_coords(world.x, world.y)
+        screen = self.ui.renderArea.toRenderCoords(world.x, world.y)
         xy = f" || x: {screen.x:.2f}, " + f"y: {screen.y:.2f}, "
 
-        status_bar = self.statusBar()  # pyright: ignore[reportGeneralTypeIssues, attr-defined]
-        if status_bar is None:
-            return
-        status_bar.showMessage(coords_text + face_text + xy)  # pyright: ignore[reportCallIssue]
+        self.statusBar().showMessage(coordsText + faceText + xy)
 
-    def on_mouse_scrolled(self, delta: Vector2, buttons: set[int], keys: set[int]):
-        if self._nav_helper.handle_mouse_scroll(
-            delta, buttons, keys, zoom_sensitivity=ModuleDesignerSettings().zoomCameraSensitivity2d
-        ):
-            self.ui.renderArea.update()
-            return
+    def onMouseScrolled(self, delta: Vector2, buttons: set[int], keys: set[int]):
+        if QtCore.Qt.Key_Control in keys:  # type: ignore[attr-defined]
+            zoomInFactor = 1.1
+            zoomOutFactor = 0.90
 
-    def on_key_pressed(self, buttons: set[int], keys: set[int]):
-        self._nav_helper.handle_key_pressed(
-            keys, buttons=buttons, pan_step=ModuleDesignerSettings().moveCameraSensitivity2d / 10
-        )
+            zoomFactor = zoomInFactor if delta.y > 0 else zoomOutFactor
+            self.ui.renderArea.camera.nudgeZoom(zoomFactor)
+            self.ui.renderArea.update()  # Trigger a re-render
 
-    def change_face_material(self, face: BWMFace):
+    def changeFaceMaterial(self, face: BWMFace):
         """Change material of a face.
 
         Args:
@@ -241,29 +219,46 @@ class BWMEditor(Editor):
             - Check if the current face material is different than the selected material
             - Assign the selected material to the provided face.
         """
-        current: QListWidgetItem | None = self.ui.materialList.currentItem()
-        if current is None:
-            return
-        new_material = current.data(Qt.ItemDataRole.UserRole)  # type: ignore[union-attr]  # pyright: ignore[reportOptionalMemberAccess]
-        if face.material == new_material:
-            return
-        face.material = new_material
+        newMaterial = self.ui.materialList.currentItem().data(QtCore.Qt.UserRole)  # type: ignore[attr-defined]
+        if face and face.material != newMaterial:
+            face.material = newMaterial
 
     def onTransitionSelect(self):
+        """Select currently highlighted transition in list.
+
+        Processing Logic:
+        ----------------
+            - Check if a transition is selected in the list
+            - If selected, get the selected item and extract the transition data
+            - Pass the transition data to the render area to highlight
+            - If no item selected, clear any existing highlight.
+        """
         if self.ui.transList.currentItem():
-            item: QListWidgetItem | None = self.ui.transList.currentItem()  # type: ignore[union-attr]  # pyright: ignore[reportOptionalMemberAccess]
-            if item is None:
-                return
-            face: BWMFace | None = item.data(_TRANS_FACE_ROLE)
-            edge: int | None = item.data(_TRANS_EDGE_ROLE)
-            self.ui.renderArea.setHighlightedTrans(face, edge)
+            item: QListWidgetItem | None = self.ui.transList.currentItem()
+            self.ui.renderArea.setHighlightedTrans(item.data(_TRANS_FACE_ROLE))  # FIXME: no function 'setHighlightedTrans'
         else:
-            self.ui.renderArea.setHighlightedTrans(None, None)
+            self.ui.renderArea.setHighlightedTrans(None)
 
-
-if __name__ == "__main__":
-    import sys
-
-    from toolset.gui.editors.standalone import launch_editor_cli
-
-    sys.exit(launch_editor_cli("bwm"))
+    def reloadSettings(self):
+        settings = GITSettings()
+        selected = self.ui.materialList.currentItem()
+        material = selected.data(QtCore.Qt.UserRole) if selected is not None else None
+        names = {
+            SurfaceMaterial.UNDEFINED: "undefined", SurfaceMaterial.OBSCURING: "obscuring",
+            SurfaceMaterial.DIRT: "dirt", SurfaceMaterial.GRASS: "grass", SurfaceMaterial.STONE: "stone",
+            SurfaceMaterial.WOOD: "wood", SurfaceMaterial.WATER: "water", SurfaceMaterial.NON_WALK: "nonWalk",
+            SurfaceMaterial.TRANSPARENT: "transparent", SurfaceMaterial.CARPET: "carpet", SurfaceMaterial.METAL: "metal",
+            SurfaceMaterial.PUDDLES: "puddles", SurfaceMaterial.SWAMP: "swamp", SurfaceMaterial.MUD: "mud",
+            SurfaceMaterial.LEAVES: "leaves", SurfaceMaterial.LAVA: "lava", SurfaceMaterial.BOTTOMLESS_PIT: "bottomlessPit",
+            SurfaceMaterial.DEEP_WATER: "deepWater", SurfaceMaterial.DOOR: "door", SurfaceMaterial.NON_WALK_GRASS: "nonWalkGrass",
+        }
+        for kind, name in names.items():
+            color = Color.from_rgba_integer(getattr(settings, name + "MaterialColour"))
+            self.materialColors[kind] = QColor(round(color.r * 255), round(color.g * 255), round(color.b * 255), round(color.a * 255))
+        self.ui.renderArea.materialColors = self.materialColors
+        self.rebuildMaterials()
+        for index in range(self.ui.materialList.count()):
+            if self.ui.materialList.item(index).data(QtCore.Qt.UserRole) == material:
+                self.ui.materialList.setCurrentRow(index)
+                break
+        self.ui.renderArea.update()

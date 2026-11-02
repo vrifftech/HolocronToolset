@@ -1,0 +1,218 @@
+name: Build optimized distributions with fresh PyInstaller
+
+on:
+  workflow_dispatch:
+    inputs:
+      pykotor_ref:
+        description: Backend branch, tag or SHA (empty uses PYKOTOR_REF variable, then repo default).
+        required: false
+        type: string
+      pyinstaller_ref:
+        description: Fork branch, tag or SHA containing the fresh-pyinstaller action (empty uses repo variable/default).
+        required: false
+        type: string
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve dependency commits once for all platforms
+    runs-on: ubuntu-22.04
+    outputs:
+      pykotor_repository: ${{ steps.refs.outputs.pykotor_repository }}
+      pyinstaller_repository: ${{ steps.refs.outputs.pyinstaller_repository }}
+      pykotor_sha: ${{ steps.refs.outputs.pykotor_sha }}
+      pyinstaller_sha: ${{ steps.refs.outputs.pyinstaller_sha }}
+    env:
+      PYKOTOR_REPOSITORY: ${{ vars.PYKOTOR_REPOSITORY || format('{0}/PyKotor', github.repository_owner) }}
+      PYINSTALLER_REPOSITORY: ${{ vars.PYINSTALLER_REPOSITORY || format('{0}/pyinstaller', github.repository_owner) }}
+    steps:
+      - name: Resolve the selected audited backend
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.PYKOTOR_REPOSITORY }}
+          ref: ${{ inputs.pykotor_ref || vars.PYKOTOR_REF }}
+          path: PyKotor
+          token: ${{ secrets.SOURCE_READ_TOKEN || github.token }}
+          persist-credentials: false
+      - name: Resolve our PyInstaller source fork
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.PYINSTALLER_REPOSITORY }}
+          ref: ${{ inputs.pyinstaller_ref || vars.PYINSTALLER_REF }}
+          path: _pyinstaller
+          token: ${{ secrets.SOURCE_READ_TOKEN || github.token }}
+          persist-credentials: false
+      - name: Validate layout and record commits
+        id: refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d PyKotor/Libraries/PyKotor/src/pykotor
+          test -d PyKotor/Libraries/Utility/src/utility
+          test -d PyKotor/Libraries/PyKotorGL/src/pykotor/gl
+          if ! test -f PyKotor/Libraries/PyKotor/src/pykotor/__pyinstaller/hook-pykotor.resource.formats.ncs.compiler.py; then
+            echo 'Apply the PyKotor packaging patch and select that commit.' >&2
+            exit 1
+          fi
+          test -f _pyinstaller/bootloader/waf
+          if ! test -f _pyinstaller/.github/actions/fresh-pyinstaller/action.yml; then
+            echo 'Add the supplied fresh-pyinstaller action to your PyInstaller fork and select that commit.' >&2
+            exit 1
+          fi
+          {
+            echo "pykotor_repository=$PYKOTOR_REPOSITORY"
+            echo "pyinstaller_repository=$PYINSTALLER_REPOSITORY"
+            echo "pykotor_sha=$(git -C PyKotor rev-parse HEAD)"
+            echo "pyinstaller_sha=$(git -C _pyinstaller rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+  package:
+    name: ${{ matrix.target }}
+    needs: resolve
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-x64
+            runner: windows-2022
+            deployment_target: ''
+          - target: linux-x86_64
+            runner: ubuntu-22.04
+            deployment_target: ''
+          - target: macos-x86_64
+            runner: macos-15-intel
+            deployment_target: '15.0'
+          - target: macos-arm64
+            runner: macos-15
+            deployment_target: '15.0'
+    defaults:
+      run:
+        shell: bash
+    env:
+      HOLOCRON_PYKOTOR_ROOT: ${{ github.workspace }}/PyKotor
+      PYINSTALLER_CONFIG_DIR: ${{ github.workspace }}/.pyinstaller-config
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
+      PYTHONUTF8: '1'
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+    steps:
+      - name: Check out this HolocronToolset revision
+        uses: actions/checkout@v7
+        with:
+          path: HolocronToolset
+          persist-credentials: false
+      - name: Check out the resolved audited backend
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ needs.resolve.outputs.pykotor_repository }}
+          ref: ${{ needs.resolve.outputs.pykotor_sha }}
+          path: PyKotor
+          token: ${{ secrets.SOURCE_READ_TOKEN || github.token }}
+          persist-credentials: false
+      - name: Check out the resolved PyInstaller fork
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ needs.resolve.outputs.pyinstaller_repository }}
+          ref: ${{ needs.resolve.outputs.pyinstaller_sha }}
+          path: _pyinstaller
+          token: ${{ secrets.SOURCE_READ_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Linux compiler, Qt/OpenGL, and AppImage dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential zlib1g-dev patchelf desktop-file-utils xvfb xauth libgl1 libglu1-mesa libgl1-mesa-dri libegl1 libxkbcommon-x11-0 libxcb-xinerama0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libpulse0 libpulse-mainloop-glib0 libasound2
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Create a clean build environment
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import venv
+          root = Path(os.environ['RUNNER_TEMP']) / 'holocron-build-venv'
+          venv.EnvBuilder(with_pip=True, clear=True).create(root)
+          bin_dir = root / ('Scripts' if os.name == 'nt' else 'bin')
+          with open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8') as stream:
+              stream.write(str(bin_dir) + '\n')
+      - name: Install application build dependencies, not upstream PyInstaller
+        working-directory: HolocronToolset
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build.txt
+          python run.py --backend-info
+      # Shared action is stored IN YOUR FORK, not copied into every app repo.
+      # It removes shipped bootloaders and Waf objects and compiles on this OS.
+      - name: Compile and install a fresh PyInstaller from our fork
+        id: fresh
+        uses: ./_pyinstaller/.github/actions/fresh-pyinstaller
+        with:
+          source-path: _pyinstaller
+          output-path: build-tools
+      - name: Build onedir-backed Linux AppImage (UPX disabled)
+        if: runner.os == 'Linux'
+        working-directory: HolocronToolset
+        run: xvfb-run -a python build/build_distributions.py --target linux-x86_64
+      - name: Build onefile Windows / onedir macOS distributions (UPX disabled)
+        if: runner.os != 'Linux'
+        working-directory: HolocronToolset
+        env:
+          BUILD_TARGET: ${{ matrix.target }}
+        run: python build/build_distributions.py --target "$BUILD_TARGET"
+      - name: Upload verified application distributions
+        uses: actions/upload-artifact@v7
+        with:
+          name: HolocronToolset-${{ matrix.target }}
+          path: HolocronToolset/release/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+      - name: Upload PyInstaller analysis
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: HolocronToolset-pyinstaller-${{ matrix.target }}-analysis
+          path: |
+            HolocronToolset/.pyinstaller-build/**/HolocronToolset/Analysis-*.toc
+            HolocronToolset/.pyinstaller-build/**/HolocronToolset/PYZ-*.toc
+            HolocronToolset/.pyinstaller-build/**/HolocronToolset/PKG-*.toc
+            HolocronToolset/.pyinstaller-build/**/HolocronToolset/EXE-*.toc
+            HolocronToolset/.pyinstaller-build/**/HolocronToolset/COLLECT-*.toc
+            HolocronToolset/.pyinstaller-build/**/HolocronToolset/warn-*.txt
+            HolocronToolset/.pyinstaller-build/**/HolocronToolset/xref-*.html
+            HolocronToolset/.pyinstaller-build/**/HolocronToolset/graph-*.dot
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload this job's reusable PyInstaller wheel and proof of compilation
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fresh-pyinstaller-${{ matrix.target }}
+          path: build-tools/*
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: Upload packaging diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packaging-diagnostics-${{ matrix.target }}
+          path: |
+            HolocronToolset/.pyinstaller-build/**/warn-*.txt
+            HolocronToolset/.pyinstaller-build/**/xref-*.html
+            _pyinstaller/bootloader/build/config.log
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14

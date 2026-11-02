@@ -1,91 +1,111 @@
-#!/usr/bin/env python3
+"""Launch Holocron Toolset or one of its editors with the selected backend."""
 from __future__ import annotations
 
-import importlib.util
+import argparse
+import importlib
+import json
+import multiprocessing
 import os
 import sys
-
 from pathlib import Path
+from toolset.bootstrap import backend_info
 
 
-def _patch_mdl_io_before_path_setup() -> None:
-    """Fix KOQ200 AABB seek(-1) in site-packages *before* setup_paths prepends repo PyKotor."""
-    try:
-        patch_py = Path(__file__).resolve().parent / "utils" / "mdl_io_aabb_patch_standalone.py"
-        if not patch_py.is_file():
-            return
-        spec = importlib.util.spec_from_file_location("_holocron_mdl_aabb", patch_py)
-        if spec is None or spec.loader is None:
-            return
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        mod.patch_all_io_mdl_files_on_disk()
-        # Before setup_paths prepends repo: fix uv-only installs (must not use find_spec — loads stale mdl_auto).
-        mod.ensure_injected_io_mdl_walkmesh()
-    except Exception:
-        pass
+EDITORS = {
+    "are": "AREEditor", "bwm": "BWMEditor", "dlg": "DLGEditor", "erf": "ERFEditor",
+    "gff": "GFFEditor", "git": "GITEditor", "ifo": "IFOEditor", "jrl": "JRLEditor",
+    "mdl": "MDLEditor", "nss": "NSSEditor", "pth": "PTHEditor", "ssf": "SSFEditor",
+    "tlk": "TLKEditor", "tpc": "TPCEditor", "twoda": "TwoDAEditor", "txt": "TXTEditor",
+    "utc": "UTCEditor", "utd": "UTDEditor", "ute": "UTEEditor", "uti": "UTIEditor",
+    "utm": "UTMEditor", "utp": "UTPEditor", "uts": "UTSEditor", "utt": "UTTEditor",
+    "utw": "UTWEditor",
+}
+INSTALLATION_EDITORS = {
+    "are", "dlg", "git", "ifo", "jrl", "nss",
+    "utc", "utd", "ute", "uti", "utm", "utp", "uts", "utt", "utw",
+}
 
 
-_patch_mdl_io_before_path_setup()
+def is_frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
 
 
-# Set up paths BEFORE importing anything that might import loggerplus (which depends on utility)
-# This is critical for both frozen and non-frozen builds
-def setup_paths():
-    """Set up sys.path for local modules."""
-    file_path = Path(__file__).resolve()
-    repo_root = file_path.parents[4]  # Go up to repo root
-
-    paths_to_add = [
-        file_path.parent.parent,  # ./Tools/HolocronToolset/src/
-        repo_root / "Tools" / "KotorDiff" / "src",  # ./Tools/KotorDiff/src/
-        repo_root
-        / "Libraries"
-        / "PyKotor"
-        / "src",  # ./Libraries/PyKotor/src/ (contains both pykotor and utility namespaces)
-    ]
-
-    for path in paths_to_add:
-        path_str = str(path)
-        if path.exists() and path_str not in sys.path:
-            sys.path.insert(0, path_str)
+def onAppCrash(etype, error, traceback):
+    from utility.error_handling import format_exception_with_variables
+    with Path("errorlog.txt").open("a", encoding="utf-8") as log:
+        log.write(format_exception_with_variables(error, etype, traceback))
+    sys.__excepthook__(etype, error, traceback)
 
 
-# After prepending repo src, patch any second io_mdl (e.g. editable tree) if still vulnerable
-setup_paths()
-try:
-    spec = importlib.util.spec_from_file_location(
-        "_holocron_mdl_aabb2",
-        Path(__file__).resolve().parent / "utils" / "mdl_io_aabb_patch_standalone.py",
-    )
-    if spec and spec.loader:
-        mod2 = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod2)
-        mod2.patch_all_io_mdl_files_on_disk()
-except Exception:
-    pass
+def main():
+    multiprocessing.freeze_support()
+    parser = argparse.ArgumentParser(description="Holocron Toolset")
+    parser.add_argument("--backend-info", action="store_true", help="Print the selected backend paths without starting Qt")
+    parser.add_argument("--editor", choices=sorted(EDITORS), help="Launch only the selected editor")
+    parser.add_argument("--file", type=Path, help="Open a file in the selected editor; omit to create a new document")
+    game = parser.add_mutually_exclusive_group()
+    game.add_argument("--k1", type=Path, metavar="DIRECTORY", help="KotOR game directory for the standalone editor")
+    game.add_argument("--k2", type=Path, metavar="DIRECTORY", help="TSL game directory for the standalone editor")
+    args, qt_args = parser.parse_known_args()
+    if args.backend_info:
+        print(json.dumps(backend_info(), indent=2))
+        return 0
+    if (args.file is not None or args.k1 is not None or args.k2 is not None) and args.editor is None:
+        parser.error("--file, --k1 and --k2 require --editor")
+    game_path = args.k1 if args.k1 is not None else args.k2
+    if args.editor in INSTALLATION_EDITORS and game_path is None:
+        parser.error(f"--editor {args.editor} requires --k1 DIRECTORY or --k2 DIRECTORY")
+    file_path = args.file.expanduser().resolve() if args.file is not None else None
+    game_path = game_path.expanduser().resolve() if game_path is not None else None
+    from PyQt5.QtCore import QThread, Qt
+    from PyQt5.QtWidgets import QApplication
+    # The help browser uses paths relative to the application package.
+    os.chdir(Path(__file__).resolve().parent)
+    if os.name == "nt":
+        os.environ.setdefault("QT_MULTIMEDIA_PREFERRED_PLUGINS", "windowsmediafoundation")
+    # Qt owns widget/event scaling. Only custom OpenGL reads use device pixels.
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    app = QApplication([sys.argv[0], *qt_args])
+    app.thread().setPriority(QThread.HighestPriority)
+    sys.excepthook = onAppCrash
+    import toolset.resources_rc
 
-try:
-    from toolset.utils.mdl_io_aabb_patch_standalone import ensure_injected_io_mdl_walkmesh
+    if args.editor is None:
+        from toolset.gui.windows.main import ToolWindow
+        window = ToolWindow()
+    else:
+        installation = None
+        if game_path is not None:
+            from toolset.data.installation import HTInstallation
+            from toolset.gui.dialogs.asyncloader import AsyncLoader
 
-    ensure_injected_io_mdl_walkmesh()
-except Exception:
-    pass
+            tsl = args.k2 is not None
 
-from toolset.utils import ensure_mdl_aabb_hotfix  # noqa: E402
+            def load_installation(report):
+                result = HTInstallation(str(game_path), game_path.name, tsl, None, progress_callback=report)
+                result.progress_callback = None
+                return result
 
-ensure_mdl_aabb_hotfix()
-os.environ["QT_QPA_PLATFORM"] = ""
+            loader = AsyncLoader(None, "Loading installation", load_installation, "Unable to load installation", with_progress=True)
+            if not loader.exec_():
+                return 1
+            installation = loader.value
+            if installation.game().is_k2() != tsl:
+                parser.error("The selected game directory does not match --k1/--k2")
+        module = importlib.import_module(f"toolset.gui.editors.{args.editor}")
+        window = getattr(module, EDITORS[args.editor])(None, installation)
+        if file_path is not None:
+            from pykotor.extract.file import ResourceIdentifier
 
-try:
-    from toolset.main_app import main
-except ImportError:
-    # If import fails, paths might not be set correctly, try again
-    setup_paths()
-    from toolset.main_app import main
+            identifier = ResourceIdentifier.from_path(file_path).validate()
+            if identifier.restype not in window._readSupported:
+                parser.error(f"The {args.editor} editor does not support {identifier.restype.name} files")
+            window.load(file_path, identifier.resname, identifier.restype, file_path.read_bytes())
+    window.show()
+    return app.exec_()
 
-from toolset.main_init import main_init  # noqa: E402
 
 if __name__ == "__main__":
-    main_init()
-    main()
+    raise SystemExit(main())

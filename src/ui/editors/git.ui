@@ -10,25 +10,6 @@
     <height>648</height>
    </rect>
   </property>
-  <action name="actionUndo">
-   <property name="text">
-    <string>Undo</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Z</string>
-   </property>
-  </action>
-  <action name="actionRedo">
-   <property name="text">
-    <string>Redo</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Y</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+Z</string>
-   </property>
-  </action>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
@@ -43,14 +24,8 @@
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
          <widget class="QLineEdit" name="filterEdit">
-          <property name="toolTip">
-           <string>Filter the instance list by tag or resref. Type part of a creature, door,
-            placeable, trigger, waypoint, or sound tag to show only matching entries. Max 16
-            characters. Does not change the GIT file—only filters what is shown in the list. Leave
-            empty to show all instances.</string>
-          </property>
           <property name="text">
-           <string />
+           <string/>
           </property>
           <property name="maxLength">
            <number>16</number>
@@ -62,12 +37,6 @@
         </item>
         <item>
          <widget class="QListWidget" name="listWidget">
-          <property name="toolTip">
-           <string>Instance list. Shows all creatures, doors, placeables, triggers, waypoints, and
-            sounds in this area (GIT). Click an entry to select it in the 3D view and edit its
-            position, rotation, or template. Use the filter box above to narrow the list by tag or
-            resref. Right-click for context menu (add, remove, duplicate).</string>
-          </property>
           <property name="maximumSize">
            <size>
             <width>16777215</width>
@@ -81,7 +50,7 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="layoutWidget1">
+      <widget class="QWidget" name="layoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -110,41 +79,39 @@
              </size>
             </property>
             <property name="toolTip">
-             <string>Lock instances. When checked, prevents moving, rotating, or deleting instances
-              in the 3D view. Use when you want to select or inspect without accidentally editing.
-              Does not modify the GIT file until you change an instance and save.</string>
+             <string>Lock all instances in place</string>
             </property>
             <property name="styleSheet">
              <string notr="true">QCheckbox {
-              spacing: 0px;
-              }
+	spacing: 0px;
+}
 
-              QCheckBox::indicator {
-              image: url(:/images/icons/lock.png);
-              border: 1px solid rgba(30, 144, 255, 0.0);
-              width: 26px;
-              height: 26px;
-              }
+QCheckBox::indicator {
+    image: url(:/images/icons/lock.png);
+	border: 1px solid rgba(30, 144, 255, 0.0);
+	width: 26px;
+	height: 26px;
+}
 
-              QCheckBox::indicator:unchecked:hover {
-              background: rgba(30, 144, 255, 0.2);
-              border: 1px solid rgba(30, 144, 255, 0.4);
-              }
+QCheckBox::indicator:unchecked:hover {
+	background: rgba(30, 144, 255, 0.2);
+	border: 1px solid rgba(30, 144, 255, 0.4);
+}
 
-              QCheckBox::indicator:checked {
-              background: rgba(30, 144, 255, 0.4);
-              border:1px solid rgba(30, 144, 255, 0.6);
-              }
+QCheckBox::indicator:checked {
+	background: rgba(30, 144, 255, 0.4);
+	border:1px solid rgba(30, 144, 255, 0.6);
+}
 
-              QCheckBox::indicator:checked:hover {
-              background: rgba(30, 144, 255, 0.5);
-              border:1px solid rgba(30, 144, 255, 0.7);
-              }
+QCheckBox::indicator:checked:hover {
+	background: rgba(30, 144, 255, 0.5);
+	border:1px solid rgba(30, 144, 255, 0.7);
+}
 
-             </string>
+</string>
             </property>
             <property name="text">
-             <string />
+             <string/>
             </property>
             <property name="checked">
              <bool>false</bool>
@@ -178,41 +145,39 @@
              </size>
             </property>
             <property name="toolTip">
-             <string>Show or hide creature instances in the 3D view. Creatures (UTC) are NPCs,
-              enemies, and party members placed in the area. Uncheck to hide them while editing
-              other object types. Does not remove them from the GIT.</string>
+             <string>Show Creatures</string>
             </property>
             <property name="styleSheet">
              <string notr="true">QCheckbox {
-              spacing: 0px;
-              }
+	spacing: 0px;
+}
 
-              QCheckBox::indicator {
-              image: url(:/images/icons/k1/creature.png);
-              border: 1px solid rgba(30, 144, 255, 0.0);
-              width: 26px;
-              height: 26px;
-              }
+QCheckBox::indicator {
+    image: url(:/images/icons/k1/creature.png);
+	border: 1px solid rgba(30, 144, 255, 0.0);
+	width: 26px;
+	height: 26px;
+}
 
-              QCheckBox::indicator:unchecked:hover {
-              background: rgba(30, 144, 255, 0.2);
-              border: 1px solid rgba(30, 144, 255, 0.4);
-              }
+QCheckBox::indicator:unchecked:hover {
+	background: rgba(30, 144, 255, 0.2);
+	border: 1px solid rgba(30, 144, 255, 0.4);
+}
 
-              QCheckBox::indicator:checked {
-              background: rgba(30, 144, 255, 0.4);
-              border:1px solid rgba(30, 144, 255, 0.6);
-              }
+QCheckBox::indicator:checked {
+	background: rgba(30, 144, 255, 0.4);
+	border:1px solid rgba(30, 144, 255, 0.6);
+}
 
-              QCheckBox::indicator:checked:hover {
-              background: rgba(30, 144, 255, 0.5);
-              border:1px solid rgba(30, 144, 255, 0.7);
-              }
+QCheckBox::indicator:checked:hover {
+	background: rgba(30, 144, 255, 0.5);
+	border:1px solid rgba(30, 144, 255, 0.7);
+}
 
-             </string>
+</string>
             </property>
             <property name="text">
-             <string />
+             <string/>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -228,37 +193,35 @@
              </size>
             </property>
             <property name="toolTip">
-             <string>Show or hide door instances (UTD) in the 3D view. Doors link areas or
-              open/close; they use a door template and position. Uncheck to hide them while editing
-              other objects. Does not remove them from the GIT.</string>
+             <string>Show Doors</string>
             </property>
             <property name="styleSheet">
              <string notr="true">QCheckBox::indicator {
-              image: url(:/images/icons/k1/door.png);
-              border: 1px solid rgba(30, 144, 255, 0.0);
-              width: 26px;
-              height: 26px;
-              }
+    image: url(:/images/icons/k1/door.png);
+	border: 1px solid rgba(30, 144, 255, 0.0);
+	width: 26px;
+	height: 26px;
+}
 
-              QCheckBox::indicator:unchecked:hover {
-              background: rgba(30, 144, 255, 0.2);
-              border: 1px solid rgba(30, 144, 255, 0.4);
-              }
+QCheckBox::indicator:unchecked:hover {
+	background: rgba(30, 144, 255, 0.2);
+	border: 1px solid rgba(30, 144, 255, 0.4);
+}
 
-              QCheckBox::indicator:checked {
-              background: rgba(30, 144, 255, 0.4);
-              border:1px solid rgba(30, 144, 255, 0.6);
-              }
+QCheckBox::indicator:checked {
+	background: rgba(30, 144, 255, 0.4);
+	border:1px solid rgba(30, 144, 255, 0.6);
+}
 
-              QCheckBox::indicator:checked:hover {
-              background: rgba(30, 144, 255, 0.5);
-              border:1px solid rgba(30, 144, 255, 0.7);
-              }
+QCheckBox::indicator:checked:hover {
+	background: rgba(30, 144, 255, 0.5);
+	border:1px solid rgba(30, 144, 255, 0.7);
+}
 
-             </string>
+</string>
             </property>
             <property name="text">
-             <string />
+             <string/>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -274,37 +237,35 @@
              </size>
             </property>
             <property name="toolTip">
-             <string>Show or hide placeable instances (UTP) in the 3D view. Placeables are
-              containers, chairs, crates, and other interactive objects. Uncheck to hide them. Does
-              not remove them from the GIT.</string>
+             <string>Show Placeables</string>
             </property>
             <property name="styleSheet">
              <string notr="true">QCheckBox::indicator {
-              image: url(:/images/icons/k1/placeable.png);
-              border: 1px solid rgba(30, 144, 255, 0.0);
-              width: 26px;
-              height: 26px;
-              }
+    image: url(:/images/icons/k1/placeable.png);
+	border: 1px solid rgba(30, 144, 255, 0.0);
+	width: 26px;
+	height: 26px;
+}
 
-              QCheckBox::indicator:unchecked:hover {
-              background: rgba(30, 144, 255, 0.2);
-              border: 1px solid rgba(30, 144, 255, 0.4);
-              }
+QCheckBox::indicator:unchecked:hover {
+	background: rgba(30, 144, 255, 0.2);
+	border: 1px solid rgba(30, 144, 255, 0.4);
+}
 
-              QCheckBox::indicator:checked {
-              background: rgba(30, 144, 255, 0.4);
-              border:1px solid rgba(30, 144, 255, 0.6);
-              }
+QCheckBox::indicator:checked {
+	background: rgba(30, 144, 255, 0.4);
+	border:1px solid rgba(30, 144, 255, 0.6);
+}
 
-              QCheckBox::indicator:checked:hover {
-              background: rgba(30, 144, 255, 0.5);
-              border:1px solid rgba(30, 144, 255, 0.7);
-              }
+QCheckBox::indicator:checked:hover {
+	background: rgba(30, 144, 255, 0.5);
+	border:1px solid rgba(30, 144, 255, 0.7);
+}
 
-             </string>
+</string>
             </property>
             <property name="text">
-             <string />
+             <string/>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -320,36 +281,35 @@
              </size>
             </property>
             <property name="toolTip">
-             <string>Show or hide merchant/store placeables in the 3D view. Merchants are placeables
-              with store data; toggling this only affects visibility, not the GIT.</string>
+             <string>Show Merchants</string>
             </property>
             <property name="styleSheet">
              <string notr="true">QCheckBox::indicator {
-              image: url(:/images/icons/k1/merchant.png);
-              border: 1px solid rgba(30, 144, 255, 0.0);
-              width: 26px;
-              height: 26px;
-              }
+    image: url(:/images/icons/k1/merchant.png);
+	border: 1px solid rgba(30, 144, 255, 0.0);
+	width: 26px;
+	height: 26px;
+}
 
-              QCheckBox::indicator:unchecked:hover {
-              background: rgba(30, 144, 255, 0.2);
-              border: 1px solid rgba(30, 144, 255, 0.4);
-              }
+QCheckBox::indicator:unchecked:hover {
+	background: rgba(30, 144, 255, 0.2);
+	border: 1px solid rgba(30, 144, 255, 0.4);
+}
 
-              QCheckBox::indicator:checked {
-              background: rgba(30, 144, 255, 0.4);
-              border:1px solid rgba(30, 144, 255, 0.6);
-              }
+QCheckBox::indicator:checked {
+	background: rgba(30, 144, 255, 0.4);
+	border:1px solid rgba(30, 144, 255, 0.6);
+}
 
-              QCheckBox::indicator:checked:hover {
-              background: rgba(30, 144, 255, 0.5);
-              border:1px solid rgba(30, 144, 255, 0.7);
-              }
+QCheckBox::indicator:checked:hover {
+	background: rgba(30, 144, 255, 0.5);
+	border:1px solid rgba(30, 144, 255, 0.7);
+}
 
-             </string>
+</string>
             </property>
             <property name="text">
-             <string />
+             <string/>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -365,37 +325,35 @@
              </size>
             </property>
             <property name="toolTip">
-             <string>Show or hide sound object instances (UTS) in the 3D view. Sound objects play
-              ambient audio; they have a position when positional. Uncheck to hide them. Does not
-              remove them from the GIT.</string>
+             <string>Show Sounds</string>
             </property>
             <property name="styleSheet">
              <string notr="true">QCheckBox::indicator {
-              image: url(:/images/icons/k1/sound.png);
-              border: 1px solid rgba(30, 144, 255, 0.0);
-              width: 26px;
-              height: 26px;
-              }
+    image: url(:/images/icons/k1/sound.png);
+	border: 1px solid rgba(30, 144, 255, 0.0);
+	width: 26px;
+	height: 26px;
+}
 
-              QCheckBox::indicator:unchecked:hover {
-              background: rgba(30, 144, 255, 0.2);
-              border: 1px solid rgba(30, 144, 255, 0.4);
-              }
+QCheckBox::indicator:unchecked:hover {
+	background: rgba(30, 144, 255, 0.2);
+	border: 1px solid rgba(30, 144, 255, 0.4);
+}
 
-              QCheckBox::indicator:checked {
-              background: rgba(30, 144, 255, 0.4);
-              border:1px solid rgba(30, 144, 255, 0.6);
-              }
+QCheckBox::indicator:checked {
+	background: rgba(30, 144, 255, 0.4);
+	border:1px solid rgba(30, 144, 255, 0.6);
+}
 
-              QCheckBox::indicator:checked:hover {
-              background: rgba(30, 144, 255, 0.5);
-              border:1px solid rgba(30, 144, 255, 0.7);
-              }
+QCheckBox::indicator:checked:hover {
+	background: rgba(30, 144, 255, 0.5);
+	border:1px solid rgba(30, 144, 255, 0.7);
+}
 
-             </string>
+</string>
             </property>
             <property name="text">
-             <string />
+             <string/>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -411,37 +369,35 @@
              </size>
             </property>
             <property name="toolTip">
-             <string>Show or hide waypoint instances (UTW) in the 3D view. Waypoints are invisible
-              markers used for scripting (e.g. MoveToPoint). Uncheck to hide them. Does not remove
-              them from the GIT.</string>
+             <string>Show Waypoints</string>
             </property>
             <property name="styleSheet">
              <string notr="true">QCheckBox::indicator {
-              image: url(:/images/icons/k1/waypoint.png);
-              border: 1px solid rgba(30, 144, 255, 0.0);
-              width: 26px;
-              height: 26px;
-              }
+    image: url(:/images/icons/k1/waypoint.png);
+	border: 1px solid rgba(30, 144, 255, 0.0);
+	width: 26px;
+	height: 26px;
+}
 
-              QCheckBox::indicator:unchecked:hover {
-              background: rgba(30, 144, 255, 0.2);
-              border: 1px solid rgba(30, 144, 255, 0.4);
-              }
+QCheckBox::indicator:unchecked:hover {
+	background: rgba(30, 144, 255, 0.2);
+	border: 1px solid rgba(30, 144, 255, 0.4);
+}
 
-              QCheckBox::indicator:checked {
-              background: rgba(30, 144, 255, 0.4);
-              border:1px solid rgba(30, 144, 255, 0.6);
-              }
+QCheckBox::indicator:checked {
+	background: rgba(30, 144, 255, 0.4);
+	border:1px solid rgba(30, 144, 255, 0.6);
+}
 
-              QCheckBox::indicator:checked:hover {
-              background: rgba(30, 144, 255, 0.5);
-              border:1px solid rgba(30, 144, 255, 0.7);
-              }
+QCheckBox::indicator:checked:hover {
+	background: rgba(30, 144, 255, 0.5);
+	border:1px solid rgba(30, 144, 255, 0.7);
+}
 
-             </string>
+</string>
             </property>
             <property name="text">
-             <string />
+             <string/>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -457,36 +413,35 @@
              </size>
             </property>
             <property name="toolTip">
-             <string>Show or hide camera instances in the 3D view. Cameras define camera
-              positions/cuts for cutscenes. Uncheck to hide them. Does not remove them from the GIT.</string>
+             <string>Show Cameras</string>
             </property>
             <property name="styleSheet">
              <string notr="true">QCheckBox::indicator {
-              image: url(:/images/icons/k1/camera.png);
-              border: 1px solid rgba(30, 144, 255, 0.0);
-              width: 26px;
-              height: 26px;
-              }
+    image: url(:/images/icons/k1/camera.png);
+	border: 1px solid rgba(30, 144, 255, 0.0);
+	width: 26px;
+	height: 26px;
+}
 
-              QCheckBox::indicator:unchecked:hover {
-              background: rgba(30, 144, 255, 0.2);
-              border: 1px solid rgba(30, 144, 255, 0.4);
-              }
+QCheckBox::indicator:unchecked:hover {
+	background: rgba(30, 144, 255, 0.2);
+	border: 1px solid rgba(30, 144, 255, 0.4);
+}
 
-              QCheckBox::indicator:checked {
-              background: rgba(30, 144, 255, 0.4);
-              border:1px solid rgba(30, 144, 255, 0.6);
-              }
+QCheckBox::indicator:checked {
+	background: rgba(30, 144, 255, 0.4);
+	border:1px solid rgba(30, 144, 255, 0.6);
+}
 
-              QCheckBox::indicator:checked:hover {
-              background: rgba(30, 144, 255, 0.5);
-              border:1px solid rgba(30, 144, 255, 0.7);
-              }
+QCheckBox::indicator:checked:hover {
+	background: rgba(30, 144, 255, 0.5);
+	border:1px solid rgba(30, 144, 255, 0.7);
+}
 
-             </string>
+</string>
             </property>
             <property name="text">
-             <string />
+             <string/>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -502,37 +457,35 @@
              </size>
             </property>
             <property name="toolTip">
-             <string>Show or hide encounter instances (UTE) in the 3D view. Encounters spawn
-              creatures when the player enters the region. Uncheck to hide them. Does not remove
-              them from the GIT.</string>
+             <string>Show Encounters</string>
             </property>
             <property name="styleSheet">
              <string notr="true">QCheckBox::indicator {
-              image: url(:/images/icons/k1/encounter.png);
-              border: 1px solid rgba(30, 144, 255, 0.0);
-              width: 26px;
-              height: 26px;
-              }
+    image: url(:/images/icons/k1/encounter.png);
+	border: 1px solid rgba(30, 144, 255, 0.0);
+	width: 26px;
+	height: 26px;
+}
 
-              QCheckBox::indicator:unchecked:hover {
-              background: rgba(30, 144, 255, 0.2);
-              border: 1px solid rgba(30, 144, 255, 0.4);
-              }
+QCheckBox::indicator:unchecked:hover {
+	background: rgba(30, 144, 255, 0.2);
+	border: 1px solid rgba(30, 144, 255, 0.4);
+}
 
-              QCheckBox::indicator:checked {
-              background: rgba(30, 144, 255, 0.4);
-              border:1px solid rgba(30, 144, 255, 0.6);
-              }
+QCheckBox::indicator:checked {
+	background: rgba(30, 144, 255, 0.4);
+	border:1px solid rgba(30, 144, 255, 0.6);
+}
 
-              QCheckBox::indicator:checked:hover {
-              background: rgba(30, 144, 255, 0.5);
-              border:1px solid rgba(30, 144, 255, 0.7);
-              }
+QCheckBox::indicator:checked:hover {
+	background: rgba(30, 144, 255, 0.5);
+	border:1px solid rgba(30, 144, 255, 0.7);
+}
 
-             </string>
+</string>
             </property>
             <property name="text">
-             <string />
+             <string/>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -548,37 +501,35 @@
              </size>
             </property>
             <property name="toolTip">
-             <string>Show or hide trigger instances (UTT) in the 3D view. Triggers detect when the
-              player enters a region and run scripts. Uncheck to hide them. Does not remove them
-              from the GIT.</string>
+             <string>Show Triggers</string>
             </property>
             <property name="styleSheet">
              <string notr="true">QCheckBox::indicator {
-              image: url(:/images/icons/k1/trigger.png);
-              border: 1px solid rgba(30, 144, 255, 0.0);
-              width: 26px;
-              height: 26px;
-              }
+    image: url(:/images/icons/k1/trigger.png);
+	border: 1px solid rgba(30, 144, 255, 0.0);
+	width: 26px;
+	height: 26px;
+}
 
-              QCheckBox::indicator:unchecked:hover {
-              background: rgba(30, 144, 255, 0.2);
-              border: 1px solid rgba(30, 144, 255, 0.4);
-              }
+QCheckBox::indicator:unchecked:hover {
+	background: rgba(30, 144, 255, 0.2);
+	border: 1px solid rgba(30, 144, 255, 0.4);
+}
 
-              QCheckBox::indicator:checked {
-              background: rgba(30, 144, 255, 0.4);
-              border:1px solid rgba(30, 144, 255, 0.6);
-              }
+QCheckBox::indicator:checked {
+	background: rgba(30, 144, 255, 0.4);
+	border:1px solid rgba(30, 144, 255, 0.6);
+}
 
-              QCheckBox::indicator:checked:hover {
-              background: rgba(30, 144, 255, 0.5);
-              border:1px solid rgba(30, 144, 255, 0.7);
-              }
+QCheckBox::indicator:checked:hover {
+	background: rgba(30, 144, 255, 0.5);
+	border:1px solid rgba(30, 144, 255, 0.7);
+}
 
-             </string>
+</string>
             </property>
             <property name="text">
-             <string />
+             <string/>
             </property>
             <property name="checked">
              <bool>true</bool>
@@ -628,16 +579,13 @@
     <property name="title">
      <string>File</string>
     </property>
-    <addaction name="actionNew" />
-    <addaction name="actionOpen" />
-    <addaction name="actionSave" />
-    <addaction name="actionSave_As" />
-    <addaction name="actionRevert" />
-    <addaction name="separator" />
-    <addaction name="actionUndo" />
-    <addaction name="actionRedo" />
-    <addaction name="separator" />
-    <addaction name="actionExit" />
+    <addaction name="actionNew"/>
+    <addaction name="actionOpen"/>
+    <addaction name="actionSave"/>
+    <addaction name="actionSave_As"/>
+    <addaction name="actionRevert"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
@@ -647,86 +595,83 @@
      <property name="title">
       <string>Waypoint Labels</string>
      </property>
-     <addaction name="actionUseWaypointResRef" />
-     <addaction name="actionUseWaypointName" />
-     <addaction name="actionUseWaypointTag" />
+     <addaction name="actionUseWaypointResRef"/>
+     <addaction name="actionUseWaypointName"/>
+     <addaction name="actionUseWaypointTag"/>
     </widget>
     <widget class="QMenu" name="menuTriggerLabels">
      <property name="title">
       <string>Trigger Labels</string>
      </property>
-     <addaction name="actionUseTriggerResRef" />
-     <addaction name="actionUseTriggerName" />
-     <addaction name="actionUseTriggerTag" />
+     <addaction name="actionUseTriggerResRef"/>
+     <addaction name="actionUseTriggerName"/>
+     <addaction name="actionUseTriggerTag"/>
     </widget>
     <widget class="QMenu" name="menuDoorLabels">
      <property name="title">
       <string>Door Labels</string>
      </property>
-     <addaction name="actionUseDoorResRef" />
-     <addaction name="actionUseDoorName" />
-     <addaction name="actionUseDoorTag" />
+     <addaction name="actionUseDoorResRef"/>
+     <addaction name="actionUseDoorName"/>
+     <addaction name="actionUseDoorTag"/>
     </widget>
     <widget class="QMenu" name="menuCreatureLabels">
      <property name="title">
       <string>Creature Labels</string>
      </property>
-     <addaction name="actionUseCreatureResRef" />
-     <addaction name="actionUseCreatureName" />
-     <addaction name="actionUseCreatureTag" />
+     <addaction name="actionUseCreatureResRef"/>
+     <addaction name="actionUseCreatureName"/>
+     <addaction name="actionUseCreatureTag"/>
     </widget>
     <widget class="QMenu" name="menuPlaceableLabels">
      <property name="title">
       <string>Placeable Labels</string>
      </property>
-     <addaction name="actionUsePlaceableResRef" />
-     <addaction name="actionUsePlaceableName" />
-     <addaction name="actionUsePlaceableTag" />
+     <addaction name="actionUsePlaceableResRef"/>
+     <addaction name="actionUsePlaceableName"/>
+     <addaction name="actionUsePlaceableTag"/>
     </widget>
     <widget class="QMenu" name="menuMerchantLabels">
      <property name="title">
       <string>Merchant Labels</string>
      </property>
-     <addaction name="actionUseMerchantResRef" />
-     <addaction name="actionUseMerchantName" />
-     <addaction name="actionUseMerchantTag" />
+     <addaction name="actionUseMerchantResRef"/>
+     <addaction name="actionUseMerchantName"/>
+     <addaction name="actionUseMerchantTag"/>
     </widget>
     <widget class="QMenu" name="menuSound_Labels">
      <property name="title">
       <string>Sound Labels</string>
      </property>
-     <addaction name="actionUseSoundResRef" />
-     <addaction name="actionUseSoundName" />
-     <addaction name="actionUseSoundTag" />
+     <addaction name="actionUseSoundResRef"/>
+     <addaction name="actionUseSoundName"/>
+     <addaction name="actionUseSoundTag"/>
     </widget>
     <widget class="QMenu" name="menuEncounterLabels">
      <property name="title">
       <string>Encounter Labels</string>
      </property>
-     <addaction name="actionUseEncounterResRef" />
-     <addaction name="actionUseEncounterName" />
-     <addaction name="actionUseEncounterTag" />
+     <addaction name="actionUseEncounterResRef"/>
+     <addaction name="actionUseEncounterName"/>
+     <addaction name="actionUseEncounterTag"/>
     </widget>
-    <addaction name="actionZoomIn" />
-    <addaction name="actionZoomOut" />
-    <addaction name="actionRecentreCamera" />
-    <addaction name="separator" />
-    <addaction name="actionShowRoomBoundaries" />
-    <addaction name="actionShowGrid" />
-    <addaction name="separator" />
-    <addaction name="menuCreatureLabels" />
-    <addaction name="menuDoorLabels" />
-    <addaction name="menuPlaceableLabels" />
-    <addaction name="menuMerchantLabels" />
-    <addaction name="menuSound_Labels" />
-    <addaction name="menuWaypointLabels" />
-    <addaction name="menuEncounterLabels" />
-    <addaction name="menuTriggerLabels" />
+    <addaction name="actionZoomIn"/>
+    <addaction name="actionZoomOut"/>
+    <addaction name="actionRecentreCamera"/>
+    <addaction name="separator"/>
+    <addaction name="menuCreatureLabels"/>
+    <addaction name="menuDoorLabels"/>
+    <addaction name="menuPlaceableLabels"/>
+    <addaction name="menuMerchantLabels"/>
+    <addaction name="menuSound_Labels"/>
+    <addaction name="menuWaypointLabels"/>
+    <addaction name="menuEncounterLabels"/>
+    <addaction name="menuTriggerLabels"/>
    </widget>
-   <addaction name="menuNew" />
-   <addaction name="menuView" />
+   <addaction name="menuNew"/>
+   <addaction name="menuView"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar" />
+  <widget class="QStatusBar" name="statusbar"/>
   <action name="actionNew">
    <property name="text">
     <string>New</string>
@@ -770,25 +715,6 @@
   <action name="actionRecentreCamera">
    <property name="text">
     <string>Reset Camera</string>
-   </property>
-  </action>
-  <action name="actionShowRoomBoundaries">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Show Room Boundaries</string>
-   </property>
-  </action>
-  <action name="actionShowGrid">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Show Grid</string>
    </property>
   </action>
   <action name="actionDeleteSelected">
@@ -946,7 +872,7 @@
   </customwidget>
  </customwidgets>
  <resources>
-  <include location="../../resources/resources.qrc" />
+  <include location="../../resources/resources.qrc"/>
  </resources>
- <connections />
+ <connections/>
 </ui>

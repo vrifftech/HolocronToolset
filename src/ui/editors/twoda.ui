@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>550</height>
+    <width>635</width>
+    <height>454</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -22,160 +22,82 @@
       </property>
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
-        <widget class="QLineEdit" name="filterEdit">
-         <property name="placeholderText">
-          <string>Type to filter rows...</string>
-         </property>
-        </widget>
+        <widget class="QLineEdit" name="filterEdit"/>
        </item>
       </layout>
      </widget>
     </item>
     <item>
-     <widget class="RobustTableView" name="twodaTable">
+     <widget class="QTableView" name="twodaTable">
       <property name="styleSheet">
-       <string notr="true" />
+       <string notr="true"/>
       </property>
       <property name="alternatingRowColors">
        <bool>true</bool>
       </property>
       <property name="selectionMode">
-       <enum>QAbstractItemView::ExtendedSelection</enum>
-      </property>
-      <property name="selectionBehavior">
-       <enum>QAbstractItemView::SelectItems</enum>
-      </property>
-      <property name="cornerButtonEnabled">
-       <bool>true</bool>
-      </property>
-      <property name="sortingEnabled">
-       <bool>false</bool>
+       <enum>QAbstractItemView::ContiguousSelection</enum>
       </property>
      </widget>
     </item>
    </layout>
   </widget>
-  <widget class="QStatusBar" name="statusbar" />
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>635</width>
      <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
     <property name="title">
-     <string>&amp;File</string>
+     <string>File</string>
     </property>
-    <addaction name="actionNew" />
-    <addaction name="actionOpen" />
-    <addaction name="actionSave" />
-    <addaction name="actionSaveAs" />
-    <addaction name="actionRevert" />
-    <addaction name="separator" />
-    <addaction name="actionImportCSV" />
-    <addaction name="actionExportCSV" />
-    <addaction name="separator" />
-    <addaction name="actionExit" />
+    <addaction name="actionNew"/>
+    <addaction name="actionOpen"/>
+    <addaction name="actionSave"/>
+    <addaction name="actionSaveAs"/>
+    <addaction name="actionRevert"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
-     <string>&amp;Edit</string>
+     <string>Edit</string>
     </property>
-    <addaction name="actionUndo" />
-    <addaction name="actionRedo" />
-    <addaction name="separator" />
-    <addaction name="actionCut" />
-    <addaction name="actionCopy" />
-    <addaction name="actionPaste" />
-    <addaction name="actionPasteTranspose" />
-    <addaction name="separator" />
-    <addaction name="actionFind" />
-    <addaction name="actionReplace" />
-    <addaction name="actionGoToRow" />
-    <addaction name="actionGoToColumn" />
-    <addaction name="separator" />
-    <addaction name="actionSelectAll" />
-    <addaction name="actionSelectBlankCells" />
-    <addaction name="actionSelectCellsWithContent" />
-    <addaction name="actionSelectRow" />
-    <addaction name="actionSelectColumn" />
-    <addaction name="actionSelectVisibleOnly" />
-    <addaction name="actionClearContents" />
+    <addaction name="actionCopy"/>
+    <addaction name="actionPaste"/>
    </widget>
-   <widget class="QMenu" name="menuData">
+   <widget class="QMenu" name="menuTools">
     <property name="title">
-     <string>&amp;Data</string>
+     <string>Tools</string>
     </property>
-    <addaction name="actionInsertRow" />
-    <addaction name="actionInsertRowAbove" />
-    <addaction name="actionInsertRowBelow" />
-    <addaction name="actionDuplicateRow" />
-    <addaction name="actionRemoveRows" />
-    <addaction name="separator" />
-    <addaction name="actionInsertColumn" />
-    <addaction name="actionRenameColumn" />
-    <addaction name="actionDuplicateColumn" />
-    <addaction name="actionDeleteColumn" />
-    <addaction name="separator" />
-    <addaction name="actionMoveColumnLeft" />
-    <addaction name="actionMoveColumnRight" />
-    <addaction name="separator" />
-    <addaction name="actionMoveRowUp" />
-    <addaction name="actionMoveRowDown" />
-    <addaction name="separator" />
-    <addaction name="actionRemoveDuplicateRows" />
-    <addaction name="separator" />
-    <addaction name="actionSort" />
-    <addaction name="actionSortAscending" />
-    <addaction name="actionSortDescending" />
-    <addaction name="separator" />
-    <addaction name="actionFillDown" />
-    <addaction name="actionFillRight" />
-    <addaction name="actionFillDownPattern" />
-    <addaction name="separator" />
-    <addaction name="actionTransposeTable" />
-    <addaction name="separator" />
-    <addaction name="actionRedoRowLabels" />
+    <addaction name="actionToggleFilter"/>
+    <addaction name="separator"/>
+    <addaction name="actionInsertRow"/>
+    <addaction name="actionDuplicateRow"/>
+    <addaction name="actionRemoveRows"/>
+    <addaction name="separator"/>
+    <addaction name="actionRedoRowLabels"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
-     <string>&amp;View</string>
+     <string>View</string>
     </property>
-    <addaction name="actionResizeColumnsToContents" />
-    <addaction name="actionResizeRowsToContents" />
-    <addaction name="actionAutoFitColumnsOnLoad" />
-    <addaction name="separator" />
-    <addaction name="actionWrapTextInCells" />
-    <addaction name="actionAlternatingRowColors" />
-    <addaction name="separator" />
-    <addaction name="actionZoomIn" />
-    <addaction name="actionZoomOut" />
-    <addaction name="actionZoomReset" />
-    <addaction name="separator" />
-    <addaction name="actionHideColumn" />
-    <addaction name="actionShowAllColumns" />
-    <addaction name="separator" />
-    <addaction name="actionColumnStatistics" />
-    <addaction name="actionHighlightNonNumeric" />
-    <addaction name="actionFreezeRowLabels" />
-    <addaction name="separator" />
     <widget class="QMenu" name="menuSetRowHeader">
      <property name="title">
       <string>Set Row Header</string>
      </property>
-     <addaction name="actionplaceholder" />
+     <addaction name="actionplaceholder"/>
     </widget>
-    <addaction name="menuSetRowHeader" />
-    <addaction name="separator" />
-    <addaction name="actionToggleFilter" />
+    <addaction name="menuSetRowHeader"/>
    </widget>
-   <addaction name="menuFile" />
-   <addaction name="menuEdit" />
-   <addaction name="menuData" />
-   <addaction name="menuView" />
+   <addaction name="menuFile"/>
+   <addaction name="menuView"/>
+   <addaction name="menuEdit"/>
+   <addaction name="menuTools"/>
   </widget>
   <action name="actionNew">
    <property name="text">
@@ -207,38 +129,12 @@
     <string>Exit</string>
    </property>
   </action>
-  <action name="actionImportCSV">
+  <action name="actionToggleFilter">
    <property name="text">
-    <string>Import CSV...</string>
-   </property>
-  </action>
-  <action name="actionExportCSV">
-   <property name="text">
-    <string>Export CSV...</string>
-   </property>
-  </action>
-  <action name="actionUndo">
-   <property name="text">
-    <string>Undo</string>
+    <string>Toggle Filter</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl+Z</string>
-   </property>
-  </action>
-  <action name="actionRedo">
-   <property name="text">
-    <string>Redo</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Y</string>
-   </property>
-  </action>
-  <action name="actionCut">
-   <property name="text">
-    <string>Cut</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+X</string>
+    <string>Ctrl+F</string>
    </property>
   </action>
   <action name="actionCopy">
@@ -257,114 +153,12 @@
     <string>Ctrl+V</string>
    </property>
   </action>
-  <action name="actionPasteTranspose">
-   <property name="text">
-    <string>Paste Transpose</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+V</string>
-   </property>
-  </action>
-  <action name="actionFind">
-   <property name="text">
-    <string>Find...</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+F</string>
-   </property>
-  </action>
-  <action name="actionReplace">
-   <property name="text">
-    <string>Replace...</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+H</string>
-   </property>
-  </action>
-  <action name="actionGoToRow">
-   <property name="text">
-    <string>Go to Row...</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+G</string>
-   </property>
-  </action>
-  <action name="actionGoToColumn">
-   <property name="text">
-    <string>Go to Column...</string>
-   </property>
-  </action>
-  <action name="actionSelectAll">
-   <property name="text">
-    <string>Select All</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+A</string>
-   </property>
-  </action>
-  <action name="actionSelectRow">
-   <property name="text">
-    <string>Select Row</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+Space</string>
-   </property>
-  </action>
-  <action name="actionSelectColumn">
-   <property name="text">
-    <string>Select Column</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Space</string>
-   </property>
-  </action>
-  <action name="actionSelectVisibleOnly">
-   <property name="text">
-    <string>Select Visible Cells Only</string>
-   </property>
-  </action>
-  <action name="actionSelectBlankCells">
-   <property name="text">
-    <string>Select Blank Cells</string>
-   </property>
-  </action>
-  <action name="actionSelectCellsWithContent">
-   <property name="text">
-    <string>Select Cells with Content</string>
-   </property>
-  </action>
-  <action name="actionClearContents">
-   <property name="text">
-    <string>Clear Contents</string>
-   </property>
-   <property name="shortcut">
-    <string>Del</string>
-   </property>
-  </action>
   <action name="actionInsertRow">
    <property name="text">
     <string>Insert Row</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+I</string>
-   </property>
-  </action>
-  <action name="actionInsertRowAbove">
-   <property name="text">
-    <string>Insert Row Above</string>
-   </property>
-  </action>
-  <action name="actionInsertRowBelow">
-   <property name="text">
-    <string>Insert Row Below</string>
-   </property>
-  </action>
-  <action name="actionDuplicateRow">
-   <property name="text">
-    <string>Duplicate Row</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+D</string>
    </property>
   </action>
   <action name="actionRemoveRows">
@@ -375,104 +169,6 @@
     <string>Ctrl+Del</string>
    </property>
   </action>
-  <action name="actionInsertColumn">
-   <property name="text">
-    <string>Insert Column...</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+I</string>
-   </property>
-  </action>
-  <action name="actionRenameColumn">
-   <property name="text">
-    <string>Rename Column...</string>
-   </property>
-  </action>
-  <action name="actionDuplicateColumn">
-   <property name="text">
-    <string>Duplicate Column</string>
-   </property>
-  </action>
-  <action name="actionDeleteColumn">
-   <property name="text">
-    <string>Delete Column</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+Del</string>
-   </property>
-  </action>
-  <action name="actionMoveColumnLeft">
-   <property name="text">
-    <string>Move Column Left</string>
-   </property>
-  </action>
-  <action name="actionMoveColumnRight">
-   <property name="text">
-    <string>Move Column Right</string>
-   </property>
-  </action>
-  <action name="actionMoveRowUp">
-   <property name="text">
-    <string>Move Row Up</string>
-   </property>
-  </action>
-  <action name="actionMoveRowDown">
-   <property name="text">
-    <string>Move Row Down</string>
-   </property>
-  </action>
-  <action name="actionRemoveDuplicateRows">
-   <property name="text">
-    <string>Remove Duplicate Rows</string>
-   </property>
-  </action>
-  <action name="actionSort">
-   <property name="text">
-    <string>Sort...</string>
-   </property>
-  </action>
-  <action name="actionSortAscending">
-   <property name="text">
-    <string>Sort Ascending</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+A</string>
-   </property>
-  </action>
-  <action name="actionSortDescending">
-   <property name="text">
-    <string>Sort Descending</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+B</string>
-   </property>
-  </action>
-  <action name="actionFillDown">
-   <property name="text">
-    <string>Fill Down</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+D</string>
-   </property>
-  </action>
-  <action name="actionFillRight">
-   <property name="text">
-    <string>Fill Right</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+R</string>
-   </property>
-  </action>
-  <action name="actionFillDownPattern">
-   <property name="text">
-    <string>Fill Down Pattern...</string>
-   </property>
-  </action>
-  <action name="actionTransposeTable">
-   <property name="text">
-    <string>Transpose Table</string>
-   </property>
-  </action>
   <action name="actionRedoRowLabels">
    <property name="text">
     <string>Redo Row Labels</string>
@@ -481,104 +177,12 @@
     <string>Ctrl+L</string>
    </property>
   </action>
-  <action name="actionResizeColumnsToContents">
+  <action name="actionDuplicateRow">
    <property name="text">
-    <string>Resize Columns to Contents</string>
-   </property>
-  </action>
-  <action name="actionResizeRowsToContents">
-   <property name="text">
-    <string>Resize Rows to Contents</string>
-   </property>
-  </action>
-  <action name="actionAutoFitColumnsOnLoad">
-   <property name="text">
-    <string>Auto-fit Columns on Load</string>
-   </property>
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-  </action>
-  <action name="actionWrapTextInCells">
-   <property name="text">
-    <string>Wrap Text in Cells</string>
-   </property>
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-  </action>
-  <action name="actionAlternatingRowColors">
-   <property name="text">
-    <string>Alternating Row Colors</string>
-   </property>
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-  </action>
-  <action name="actionZoomIn">
-   <property name="text">
-    <string>Zoom In</string>
+    <string>Duplicate Row</string>
    </property>
    <property name="shortcut">
-    <string>Ctrl++</string>
-   </property>
-  </action>
-  <action name="actionZoomOut">
-   <property name="text">
-    <string>Zoom Out</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+-</string>
-   </property>
-  </action>
-  <action name="actionZoomReset">
-   <property name="text">
-    <string>Reset Zoom</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+0</string>
-   </property>
-  </action>
-  <action name="actionHideColumn">
-   <property name="text">
-    <string>Hide Column</string>
-   </property>
-  </action>
-  <action name="actionShowAllColumns">
-   <property name="text">
-    <string>Show All Columns</string>
-   </property>
-  </action>
-  <action name="actionColumnStatistics">
-   <property name="text">
-    <string>Column Statistics...</string>
-   </property>
-  </action>
-  <action name="actionHighlightNonNumeric">
-   <property name="text">
-    <string>Highlight Non-Numeric</string>
-   </property>
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-  </action>
-  <action name="actionFreezeRowLabels">
-   <property name="text">
-    <string>Freeze Row Labels</string>
-   </property>
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-  </action>
-  <action name="actionToggleFilter">
-   <property name="text">
-    <string>Toggle Filter</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+F</string>
+    <string>Ctrl+D</string>
    </property>
   </action>
   <action name="actionplaceholder">
@@ -587,13 +191,6 @@
    </property>
   </action>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>RobustTableView</class>
-   <extends>QTableView</extends>
-   <header location="global">utility.gui.qt.widgets.itemviews.tableview</header>
-  </customwidget>
- </customwidgets>
- <resources />
- <connections />
+ <resources/>
+ <connections/>
 </ui>

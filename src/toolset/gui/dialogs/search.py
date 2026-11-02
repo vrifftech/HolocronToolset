@@ -1,103 +1,33 @@
-"""Reference search dialog: run reference finder and open results in editors."""
-
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Generator
+from typing import TYPE_CHECKING
 
-from qtpy.QtCore import (
-    Qt,
-    Signal,  # pyright: ignore[reportPrivateImportUsage]
-)
-from qtpy.QtWidgets import QDialog, QListWidgetItem
-
-from pykotor.extract.file import FileResource
 from pykotor.resource.type import ResourceType
-from pykotor.tools.reference_finder import ReferenceSearchResult
-from toolset.data.installation import HTInstallation
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QDialog, QListWidgetItem, QWidget
 from toolset.gui.dialogs.asyncloader import AsyncLoader
-from toolset.utils.window import open_resource_editor
+from toolset.utils.window import openResourceEditor
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
-    from qtpy.QtWidgets import QWidget
-
-
-@dataclass
-class FileSearchQuery:
-    """Encapsulates search parameters for file search operations."""
-
-    installation: HTInstallation
-    case_sensitive: bool
-    filenames_only: bool
-    text: str
-    search_core: bool
-    search_modules: bool
-    search_override: bool
-    check_types: list[ResourceType]
+    from pykotor.extract.file import FileResource
+    from toolset.data.installation import HTInstallation
 
 
 class FileSearcher(QDialog):
-    file_results = Signal(list, HTInstallation)  # pyright: ignore[reportPrivateImportUsage]
 
-    def __init__(
-        self,
-        parent: QWidget | None,
-        installations: dict[str, HTInstallation],
-    ):
+    def __init__(self, parent: QWidget, installations: dict[str, HTInstallation]):
         super().__init__(parent)
-        self.setWindowFlags(
-            Qt.WindowType.Dialog  # pyright: ignore[reportArgumentType]
-            | Qt.WindowType.WindowCloseButtonHint
-            | Qt.WindowType.WindowMinMaxButtonsHint & ~Qt.WindowType.WindowContextHelpButtonHint,
-        )
 
-        from toolset.uic.qtpy.dialogs.search import Ui_Dialog
-
-        self.ui = Ui_Dialog()
+        from toolset.uic.dialogs import search
+        self.ui = search.Ui_Dialog()
         self.ui.setupUi(self)
 
-        # Setup event filter to prevent scroll wheel interaction with controls
-        from toolset.gui.common.filters import NoScrollEventFilter
-
-        self._no_scroll_filter = NoScrollEventFilter(self)
-        self._no_scroll_filter.setup_filter(parent_widget=self)
-
-        assert installations, "No installations passed to FileSearcher"
+        self.results: list[FileResource] = []
+        self.installation: HTInstallation | None = None
 
         self._installations: dict[str, HTInstallation] = installations
         for name, installation in installations.items():
             self.ui.installationSelect.addItem(name, installation)
-
-        # Connect the Select All checkbox signal to the slot
-        self.ui.selectAllCheck.stateChanged.connect(self.toggle_all_checkboxes)
-
-    def toggle_all_checkboxes(
-        self,
-        state: Qt.CheckState,
-    ):
-        """Toggles the state of all checkboxes based on the Select All checkbox state."""
-        check_state: bool = state == Qt.CheckState.Checked
-        self.ui.typeARECheck.setChecked(check_state)
-        self.ui.typeGITCheck.setChecked(check_state)
-        self.ui.typeIFOCheck.setChecked(check_state)
-        self.ui.typeVISCheck.setChecked(check_state)
-        self.ui.typeLYTCheck.setChecked(check_state)
-        self.ui.typeDLGCheck.setChecked(check_state)
-        self.ui.typeJRLCheck.setChecked(check_state)
-        self.ui.typeUTCCheck.setChecked(check_state)
-        self.ui.typeUTDCheck.setChecked(check_state)
-        self.ui.typeUTECheck.setChecked(check_state)
-        self.ui.typeUTICheck.setChecked(check_state)
-        self.ui.typeUTPCheck.setChecked(check_state)
-        self.ui.typeUTMCheck.setChecked(check_state)
-        self.ui.typeUTWCheck.setChecked(check_state)
-        self.ui.typeUTSCheck.setChecked(check_state)
-        self.ui.typeUTTCheck.setChecked(check_state)
-        self.ui.type2DACheck.setChecked(check_state)
-        self.ui.typeNSSCheck.setChecked(check_state)
-        self.ui.typeNCSCheck.setChecked(check_state)
 
     def accept(self):
         """Submits search parameters and starts search.
@@ -113,196 +43,117 @@ class FileSearcher(QDialog):
             searchOverride: {True if override search is checked, False otherwise}
             checkTypes: {List of selected resource types}.
 
-        Returns:
+        Returns
         -------
             None
+        {Processes user search parameters by:
+            - Getting selected installation
+            - Getting search options from UI
+            - Mapping checked resource types to list
+            - Calling search function to start search}.
         """
-        check_types: list[ResourceType] = []
-        if self.ui.typeARECheck.isChecked():
-            check_types.append(ResourceType.ARE)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeGITCheck.isChecked():
-            check_types.append(ResourceType.GIT)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeIFOCheck.isChecked():
-            check_types.append(ResourceType.IFO)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeVISCheck.isChecked():
-            check_types.append(ResourceType.VIS)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeLYTCheck.isChecked():
-            check_types.append(ResourceType.LYT)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeDLGCheck.isChecked():
-            check_types.append(ResourceType.DLG)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeJRLCheck.isChecked():
-            check_types.append(ResourceType.JRL)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeUTCCheck.isChecked():
-            check_types.append(ResourceType.UTC)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeUTDCheck.isChecked():
-            check_types.append(ResourceType.UTD)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeUTECheck.isChecked():
-            check_types.append(ResourceType.UTE)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeUTICheck.isChecked():
-            check_types.append(ResourceType.UTI)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeUTPCheck.isChecked():
-            check_types.append(ResourceType.UTP)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeUTMCheck.isChecked():
-            check_types.append(ResourceType.UTM)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeUTSCheck.isChecked():
-            check_types.append(ResourceType.UTS)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeUTTCheck.isChecked():
-            check_types.append(ResourceType.UTT)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeUTWCheck.isChecked():
-            check_types.append(ResourceType.UTW)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.type2DACheck.isChecked():
-            check_types.append(ResourceType.TwoDA)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeNSSCheck.isChecked():
-            check_types.append(ResourceType.NSS)  # noqa: E701  # pylint: disable=multiple-statements
-        if self.ui.typeNCSCheck.isChecked():
-            check_types.append(ResourceType.NCS)  # noqa: E701  # pylint: disable=multiple-statements
+        installation: HTInstallation = self.ui.installationSelect.currentData()
+        caseSensitive = self.ui.caseSensitiveRadio.isChecked()
+        filenamesOnly = self.ui.filenamesOnlyCheck.isChecked()
+        text = self.ui.searchTextEdit.text()
 
-        query = FileSearchQuery(
-            installation=self.ui.installationSelect.currentData(),
-            case_sensitive=self.ui.caseSensitiveRadio.isChecked(),
-            filenames_only=self.ui.filenamesOnlyCheck.isChecked(),
-            text=self.ui.searchTextEdit.text(),
-            search_core=self.ui.coreCheck.isChecked(),
-            search_modules=self.ui.modulesCheck.isChecked(),
-            search_override=self.ui.overrideCheck.isChecked(),
-            check_types=check_types,
-        )
+        searchCore = self.ui.coreCheck.isChecked()
+        searchModules = self.ui.modulesCheck.isChecked()
+        searchOverride = self.ui.overrideCheck.isChecked()
 
-        self.search(query)
+        checkTypes: list[ResourceType] = []
+        if self.ui.typeARECheck.isChecked(): checkTypes.append(ResourceType.ARE)  # noqa: E701
+        if self.ui.typeGITCheck.isChecked(): checkTypes.append(ResourceType.GIT)  # noqa: E701
+        if self.ui.typeIFOCheck.isChecked(): checkTypes.append(ResourceType.IFO)  # noqa: E701
+        if self.ui.typeDLGCheck.isChecked(): checkTypes.append(ResourceType.DLG)  # noqa: E701
+        if self.ui.typeJRLCheck.isChecked(): checkTypes.append(ResourceType.JRL)  # noqa: E701
+        if self.ui.typeUTCCheck.isChecked(): checkTypes.append(ResourceType.UTC)  # noqa: E701
+        if self.ui.typeUTDCheck.isChecked(): checkTypes.append(ResourceType.UTD)  # noqa: E701
+        if self.ui.typeUTECheck.isChecked(): checkTypes.append(ResourceType.UTE)  # noqa: E701
+        if self.ui.typeUTICheck.isChecked(): checkTypes.append(ResourceType.UTI)  # noqa: E701
+        if self.ui.typeUTPCheck.isChecked(): checkTypes.append(ResourceType.UTP)  # noqa: E701
+        if self.ui.typeUTMCheck.isChecked(): checkTypes.append(ResourceType.UTM)  # noqa: E701
+        if self.ui.typeUTWCheck.isChecked(): checkTypes.append(ResourceType.UTW)  # noqa: E701
+        if self.ui.typeUTSCheck.isChecked(): checkTypes.append(ResourceType.UTS)  # noqa: E701
+        if self.ui.typeUTTCheck.isChecked(): checkTypes.append(ResourceType.UTT)  # noqa: E701
+        if self.ui.type2DACheck.isChecked(): checkTypes.append(ResourceType.TwoDA)  # noqa: E701
+        if self.ui.typeNSSCheck.isChecked(): checkTypes.append(ResourceType.NSS)  # noqa: E701
+        if self.ui.typeNCSCheck.isChecked(): checkTypes.append(ResourceType.NCS)  # noqa: E701
 
-    def search(
-        self,
-        query: FileSearchQuery,
-    ):
-        """Searches files and resources for text.
+        if self.search(installation, caseSensitive, filenamesOnly, text, searchCore, searchModules, searchOverride, checkTypes):
+            self.installation = installation
+            super().accept()
 
-        Args:
-        ----
-            query (FileSearchQuery): The search parameters
-        """
-        results: list[FileResource] = []
+    def search(self, installation: HTInstallation, caseSensitive: bool, filenamesOnly: bool, text: str,
+               searchCore: bool, searchModules: bool, searchOverride: bool, checkTypes: list[ResourceType]) -> bool:
+        """Enumerate and search on the worker; publish results only after completion."""
+        self.results = []
+        selected_types = frozenset(checkTypes)
+        lowercase_text = text.lower()
 
-        def search_generator() -> Generator[FileResource, Any, None]:
-            if query.search_core:
-                yield from query.installation.core_resources()
-            if query.search_modules:
-                for module in query.installation.modules_list():
-                    yield from query.installation.module_resources(module)
-            if query.search_override:
-                for folder in query.installation.override_list():
-                    yield from query.installation.override_resources(folder)
+        def resources(report):
+            if searchCore:
+                yield from installation.chitin_resources()
+            if searchModules:
+                for module in installation.modules_list():
+                    report(f"Searching module {module}", "update_subtask_text")
+                    yield from installation.module_resources(module)
+            if searchOverride:
+                for folder in installation.override_list():
+                    report(f"Searching Override folder {folder}", "update_subtask_text")
+                    yield from installation.override_resources(folder)
 
-        search_text = query.text if query.case_sensitive else query.text.lower()
+        def collect(report):
+            report(0, "set_maximum")
+            results = []
+            if not selected_types:
+                return results
+            for index, resource in enumerate(resources(report)):
+                if index % 64 == 0:
+                    report(f"Checking resource {index + 1}: {resource.resname()}", "update_subtask_text")
+                if resource.restype() not in selected_types:
+                    continue
+                name = resource.resname()
+                name_match = text in name if caseSensitive else lowercase_text in name.lower()
+                if name_match:
+                    results.append(resource)
+                elif not filenamesOnly:
+                    report(f"Reading {name}", "update_subtask_text")
+                    data = resource.data().decode("utf-8", errors="ignore")
+                    data_match = text in data if caseSensitive else lowercase_text in data.lower()
+                    if data_match:
+                        results.append(resource)
+            return results
 
-        def _search(resource: FileResource):
-            resource_name: str = resource.resname()
-            name_check: bool = search_text in (
-                resource_name if query.case_sensitive else resource_name.lower()
-            )
-            if name_check:
-                results.append(resource)
-            if query.filenames_only:
-                return
-            if resource.restype() not in query.check_types:
-                return
-            resource_data: str = resource.data().decode(encoding="ascii", errors="ignore")  # HACK:
-            if search_text in (resource_data if query.case_sensitive else resource_data.lower()):
-                results.append(resource)
-
-        search_in: Generator[FileResource, Any, None] = search_generator()
-        searches: list[Callable[[FileResource], None]] = [
-            lambda resource=resource: _search(resource) for resource in search_in
-        ]
-        AsyncLoader(self, "Searching...", searches, "An error occured during the search").exec()
-        self.file_results.emit(results, query.installation)
+        loader = AsyncLoader(self, "Searching...", collect, "Search failed", with_progress=True)
+        if not loader.exec_():
+            return False
+        self.results = loader.value
+        return True
 
 
 class FileResults(QDialog):
-    sig_searchresults_selected = Signal(FileResource)  # pyright: ignore[reportPrivateImportUsage]
-
-    def __init__(
-        self,
-        parent: QWidget,
-        results: list[FileResource] | set[FileResource] | list[ReferenceSearchResult],
-        installation: HTInstallation,
-    ):
-        """Initialize the search results dialog.
-
-        Args:
-        ----
-            parent (QWidget): Parent widget
-            results: List of FileResource or ReferenceSearchResult objects
-            installation (HTInstallation): HT installation object
-
-        Processing Logic:
-        ----------------
-            - Populate the list widget with search results
-            - Connect button click signals to accept and open actions
-            - Save search results and installation object as member variables
-            - Sort results alphabetically.
-            - Display field paths for ReferenceSearchResult objects
-        """
+    def __init__(self, parent: QWidget, results: list[FileResource], installation: HTInstallation):
+        """Initialize the search results dialog."""
         super().__init__(parent)
-        self.setWindowFlags(
-            Qt.WindowType.Dialog  # pyright: ignore[reportArgumentType]
-            | Qt.WindowType.WindowCloseButtonHint
-            | Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.WindowMinMaxButtonsHint & ~Qt.WindowType.WindowContextHelpButtonHint,
-        )
 
-        from toolset.uic.qtpy.dialogs.search_result import Ui_Dialog
-
+        from toolset.uic.dialogs.search_result import Ui_Dialog
         self.ui = Ui_Dialog()
         self.ui.setupUi(self)
 
-        # Setup event filter to prevent scroll wheel interaction with controls
-        from toolset.gui.common.filters import NoScrollEventFilter
-
-        self._no_scroll_filter = NoScrollEventFilter(self)
-        self._no_scroll_filter.setup_filter(parent_widget=self)
-
         self.ui.openButton.clicked.connect(self.open)
-        self.ui.okButton.clicked.connect(lambda: self.accept())
-        self.ui.resultList.itemDoubleClicked.connect(self.open)
+        self.ui.okButton.clicked.connect(self.accept)
 
         self.selection: FileResource | None = None
         self.installation: HTInstallation = installation
 
         for result in results:
-            if isinstance(result, ReferenceSearchResult):
-                # Handle ReferenceSearchResult
-                file_resource = result.file_resource
-                filename: str = file_resource.filename()
-                filepath: Path = file_resource.filepath()
-                parent_name: str = (
-                    filepath.name if filename != filepath.name else f"{filepath.parent.name}"
-                )
-                display_text = f"{parent_name}/{filename}"
-                if result.field_path and result.field_path != "(NCS bytecode)":
-                    display_text += f" [{result.field_path}]"
-                item: QListWidgetItem = QListWidgetItem(display_text)
-                item.setData(Qt.ItemDataRole.UserRole, file_resource)
-                tooltip_parts = [str(file_resource.filepath())]
-                if result.field_path:
-                    tooltip_parts.append(f"Field: {result.field_path}")
-                if result.matched_value:
-                    tooltip_parts.append(f"Value: {result.matched_value}")
-                if result.byte_offset is not None:
-                    tooltip_parts.append(f"Byte offset: {result.byte_offset:#X}")
-                item.setToolTip("\n".join(tooltip_parts))
-            else:
-                # Handle FileResource
-                filename = result.filename()
-                filepath = result.filepath()
-                parent_name = (
-                    filepath.name if filename != filepath.name else f"{filepath.parent.name}"
-                )
-                item = QListWidgetItem(f"{parent_name}/{filename}")
-                item.setData(Qt.ItemDataRole.UserRole, result)
-                item.setToolTip(str(result.filepath()))
-            self.ui.resultList.addItem(item)  # type: ignore[arg-type]
+            item = QListWidgetItem(result.filename())
+            item.setData(QtCore.Qt.UserRole, result)
+            item.setToolTip(str(result.filepath()))
+            self.ui.resultList.addItem(item)
 
-        self.ui.resultList.sortItems(Qt.SortOrder.AscendingOrder)  # type: ignore[arg-type]
+        self.ui.resultList.sortItems(QtCore.Qt.AscendingOrder)
 
     def accept(self):
         """Accepts the current selection from the result list.
@@ -311,40 +162,24 @@ class FileResults(QDialog):
         ----
             self: The object instance.
 
+        Returns:
+        -------
+            None: Does not return anything.
+
         Processes the current selection:
             - Gets the current item from the result list
             - Gets the data associated with the item if it exists
             - Sets the selection attribute to the data
             - Calls the parent accept method.
         """
-        item: QListWidgetItem | None = self.ui.resultList.currentItem()
-        if item:
-            self.selection = item.data(Qt.ItemDataRole.UserRole)
-            self.sig_searchresults_selected.emit(self.selection)
+        item = self.ui.resultList.currentItem()
+        self.selection = item.data(QtCore.Qt.UserRole) if item is not None else None
         super().accept()
 
-    def open(self):
-        """Opens the current item in the result list.
-
-        Args:
-        ----
-            self: The class instance.
-
-        Processing Logic:
-        ----------------
-            - Gets the current item from the result list
-            - Checks if an item is selected
-            - Gets the FileResource object from the item's data
-            - Opens the resource editor window with the resource's details.
-        """
-        item: QListWidgetItem | None = self.ui.resultList.currentItem()  # type: ignore[arg-type]
-        if item is None:
-            print("Nothing to open, item is None")
-            return
-
-        resource: FileResource = item.data(Qt.ItemDataRole.UserRole)
-        open_resource_editor(
-            resource,
-            installation=self.installation,
-            parent_window=self.window().parent(),  # type: ignore[arg-type]
-        )
+    def open(self):  # noqa: A003
+        """Opens the current item in the result list."""
+        item: QListWidgetItem | None = self.ui.resultList.currentItem()
+        if item:
+            resource: FileResource = item.data(QtCore.Qt.UserRole)
+            openResourceEditor(resource.filepath(), resource.resname(), resource.restype(), resource.data(),
+                               self.installation, self.window().parent())
