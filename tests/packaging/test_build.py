@@ -11,7 +11,7 @@ import sys
 import tempfile
 from types import ModuleType, SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "build"))
@@ -214,6 +214,93 @@ class SpecTests(BuildFixture):
         self.assertIn("PySide6", analysis["excludes"])
         hook = runpy.run_path(str(ROOT / "build/hooks/hook-toolset.data.script_analysis.py"))
         self.assertEqual(hook["module_collection_mode"], "pyz+py")
+
+
+class GuiSmokeTests(unittest.TestCase):
+    @staticmethod
+    def frozen_ok(command, **kwargs):
+        Path(command[2]).write_text(json.dumps({"ok": True, "frozen": True}), encoding="utf-8")
+        return SimpleNamespace(returncode=0)
+
+    def test_startup_failure_keeps_the_qt_diagnostic(self):
+        process = Mock(returncode=-6)
+        process.communicate.return_value = (None, "Could not load Qt platform plugin xcb: missing library")
+        with patch.object(smoke_test.subprocess, "run", side_effect=self.frozen_ok), \
+             patch.object(smoke_test.subprocess, "Popen", return_value=process) as launch, \
+             patch.object(smoke_test, "_stop_gui") as stop, \
+             self.assertRaisesRegex(RuntimeError, "xcb: missing library"):
+            smoke_test.smoke_test(Path("executable"))
+        stop.assert_called_once_with(process)
+        self.assertEqual(launch.call_args.kwargs["stderr"], smoke_test.subprocess.PIPE)
+        self.assertEqual(launch.call_args.kwargs["env"]["QT_DEBUG_PLUGINS"], "1")
+
+    def test_running_gui_is_stopped_before_the_temporary_directory_is_removed(self):
+        process = Mock()
+        process.communicate.side_effect = smoke_test.subprocess.TimeoutExpired("GUI", 3)
+        def stopped(gui):
+            self.assertTrue(Path(launch.call_args.kwargs["cwd"]).is_dir())
+        with patch.object(smoke_test.subprocess, "run", side_effect=self.frozen_ok), \
+             patch.object(smoke_test.subprocess, "Popen", return_value=process) as launch, \
+             patch.object(smoke_test, "_stop_gui", side_effect=stopped) as stop:
+            self.assertTrue(smoke_test.smoke_test(Path("executable"))["ok"])
+        stop.assert_called_once_with(process)
+        self.assertFalse(Path(launch.call_args.kwargs["cwd"]).exists())
+
+    def test_windows_cleanup_terminates_launcher_and_children(self):
+        process = Mock(pid=12345)
+        process.poll.return_value = None
+        with patch.object(smoke_test.os, "name", "nt"), \
+             patch.object(smoke_test.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as taskkill:
+            smoke_test._stop_gui(process)
+        self.assertEqual(taskkill.call_args.args[0], ["taskkill", "/PID", "12345", "/T", "/F"])
+        process.communicate.assert_called_once_with(timeout=10)
+
+    def test_failed_windows_tree_cleanup_is_reported(self):
+        process = Mock(pid=12345)
+        process.poll.return_value = None
+        result = SimpleNamespace(returncode=1, stderr="Access is denied")
+        with patch.object(smoke_test.os, "name", "nt"), \
+             patch.object(smoke_test.subprocess, "run", return_value=result), \
+             self.assertRaisesRegex(RuntimeError, "Access is denied"):
+            smoke_test._stop_gui(process)
+
+    def test_posix_cleanup_escalates_for_children_that_ignore_termination(self):
+        process = Mock(pid=12345)
+        process.communicate.side_effect = [smoke_test.subprocess.TimeoutExpired("GUI", 10), (None, "")]
+        signals = SimpleNamespace(SIGTERM=15, SIGKILL=9)
+        with patch.object(smoke_test.os, "name", "posix"), \
+             patch.object(smoke_test, "signal", signals), \
+             patch.object(smoke_test.os, "killpg", create=True) as kill_group:
+            smoke_test._stop_gui(process)
+        self.assertEqual(kill_group.call_args_list, [call(12345, 15), call(12345, 9)])
+
+    @unittest.skipUnless(os.name == "posix", "POSIX process groups")
+    def test_real_child_holding_stderr_is_stopped_with_its_parent(self):
+        import select
+
+        command = (
+            "import subprocess, sys, time; "
+            "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']); "
+            "print('ready', file=sys.stderr, flush=True); time.sleep(60)"
+        )
+        process = smoke_test.subprocess.Popen(
+            [sys.executable, "-c", command], stdin=smoke_test.subprocess.DEVNULL,
+            stdout=smoke_test.subprocess.DEVNULL, stderr=smoke_test.subprocess.PIPE,
+            text=True, start_new_session=True,
+        )
+        try:
+            ready, _, _ = select.select([process.stderr], [], [], 5)
+            self.assertTrue(ready, "Process fixture did not start")
+            self.assertEqual(process.stderr.readline(), "ready\n")
+            smoke_test._stop_gui(process)
+            self.assertIsNotNone(process.returncode)
+            self.assertTrue(process.stderr.closed)
+        finally:
+            try:
+                os.killpg(process.pid, smoke_test.signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.communicate(timeout=5)
 
 
 class DistributionTests(unittest.TestCase):
