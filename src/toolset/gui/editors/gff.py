@@ -15,7 +15,6 @@ from PyQt5.QtCore import QItemSelectionRange, QModelIndex, QSortFilterProxyModel
 from PyQt5.QtGui import QBrush, QColor, QStandardItem, QStandardItemModel
 from PyQt5.QtWidgets import QFileDialog, QListWidgetItem, QMenu, QMessageBox, QShortcut, QWidget
 from toolset.gui.editor import Editor
-from utility.error_handling import format_exception_with_variables
 
 if TYPE_CHECKING:
     import os
@@ -77,6 +76,7 @@ class GFFEditor(Editor):
 
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self.ui.stringrefSpin.setRange(-1, 0xFFFFFFFE)
         self.ui.substringLangCombo.clear()
         for language in Language:
             if language.get_encoding() is not None:
@@ -164,6 +164,7 @@ class GFFEditor(Editor):
         """
         super().load(filepath, resref, restype, data)
         gff: GFF = read_gff(data)
+        self._content = gff.content if gff._binary_data else None
         self._binary_data = gff._binary_data
 
         self.model.clear()
@@ -264,19 +265,17 @@ class GFFEditor(Editor):
             - Writes the populated GFF to a byte array
             - Returns the byte array and an empty byte array.
         """
-        try:
-            content = GFFContent(f"{self._restype.extension.upper()} ")
-        except ValueError as e:
-            print(format_exception_with_variables(e))
-            content = GFFContent.GFF
-
+        content = self._content
+        if content is None:
+            content = GFFContent(f"{self._restype.target_type().extension.upper()} ") if self._restype else GFFContent.GFF
         gff = GFF(content)
         gff._binary_data = self._binary_data
 
         self._build_struct(self.model.item(0, 0), gff.root)
 
         data = bytearray()
-        write_gff(gff, data)
+        file_format = ResourceType.GFF_XML if self._restype and self._restype.extension.endswith(".xml") else ResourceType.GFF
+        write_gff(gff, data, file_format)
         return data, b""
 
     def _build_struct(self, item: QStandardItem, gffStruct: GFFStruct):
@@ -340,6 +339,7 @@ class GFFEditor(Editor):
 
     def new(self):
         super().new()
+        self._content: GFFContent | None = None
         self._binary_data = b""
         self.model.clear()
         self.model.setColumnCount(1)

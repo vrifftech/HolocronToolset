@@ -41,6 +41,8 @@ class JRLEditor(Editor):
 
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self.ui.categoryPlotSpin.setRange(-0x80000000, 0x7FFFFFFF)
+        self.ui.entryIdSpin.setRange(0, 0xFFFFFFFF)
         for index in range(self.ui.categoryPrioritySelect.count()):
             self.ui.categoryPrioritySelect.setItemData(index, index)
         self._setupMenus()

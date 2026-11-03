@@ -55,7 +55,7 @@ class TPCEditor(Editor):
         self.formatStatus = QLabel(self)
         self.formatSelect = QComboBox(self)
         self.convertButton = QPushButton("Convert whole texture", self)
-        self.formatSelect.setToolTip("Converts every image and mipmap. RGB, Greyscale and DXT1 remove alpha; DXT formats are lossy. Cycle conversion supports DXT1/DXT5.")
+        self.formatSelect.setToolTip("Converts the whole texture. Compression is lossy. RGB, Greyscale, DXT1 and PVRTC4_RGB remove alpha. PVRTC targets K1 and requires power-of-two dimensions. Other TPC formats end rectangular mip chains when the shorter side reaches 1 pixel.")
         formats.addWidget(self.formatStatus)
         formats.addWidget(self.formatSelect)
         formats.addWidget(self.convertButton)
@@ -150,11 +150,15 @@ class TPCEditor(Editor):
         self.formatStatus.setText(f"Stored: {self._tpc.format().name}")
         self.formatSelect.blockSignals(True)
         self.formatSelect.clear()
-        for texture_format in dict.fromkeys((self._tpc.format(), TPCTextureFormat.Greyscale,
-                                            TPCTextureFormat.RGB, TPCTextureFormat.RGBA,
-                                            TPCTextureFormat.DXT1, TPCTextureFormat.DXT5)):
+        settings = self._tpc.effective_txi.settings(game=self._tpc.header.game)
+        formats = (TPCTextureFormat.Greyscale, TPCTextureFormat.RGB, TPCTextureFormat.RGBA,
+                   TPCTextureFormat.DXT1, TPCTextureFormat.DXT5)
+        if images[0].kind == "image" and settings.controller is None and not settings.texture["isbumpmap"]:
+            formats += (TPCTextureFormat.PVRTC4_RGB, TPCTextureFormat.PVRTC4_RGBA)
+        for texture_format in dict.fromkeys((self._tpc.format(), *formats)):
             if images[0].kind != "frame" or texture_format in (self._tpc.format(), TPCTextureFormat.DXT1, TPCTextureFormat.DXT5):
-                self.formatSelect.addItem(texture_format.name, texture_format)
+                name = texture_format.name + " (K1)" if texture_format in (TPCTextureFormat.PVRTC4_RGB, TPCTextureFormat.PVRTC4_RGBA) else texture_format.name
+                self.formatSelect.addItem(name, texture_format)
         self.formatSelect.setCurrentIndex(self.formatSelect.findData(self._tpc.format()))
         self.formatSelect.blockSignals(False)
         self._updateConversionState()

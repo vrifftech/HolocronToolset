@@ -101,7 +101,7 @@ class Ui_MainWindow(object):
         self.label_8 = QtWidgets.QLabel(self.entryPage)
         self.label_8.setObjectName("label_8")
         self.formLayout_2.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.label_8)
-        self.entryIdSpin = QtWidgets.QSpinBox(self.entryPage)
+        self.entryIdSpin = LongSpinBox(self.entryPage)
         self.entryIdSpin.setMinimumSize(QtCore.QSize(80, 0))
         self.entryIdSpin.setObjectName("entryIdSpin")
         self.formLayout_2.setWidget(0, QtWidgets.QFormLayout.FieldRole, self.entryIdSpin)
@@ -111,7 +111,7 @@ class Ui_MainWindow(object):
         self.label_9 = QtWidgets.QLabel(self.entryPage)
         self.label_9.setObjectName("label_9")
         self.formLayout_2.setWidget(1, QtWidgets.QFormLayout.LabelRole, self.label_9)
-        self.entryXpSpin = QtWidgets.QDoubleSpinBox(self.entryPage)
+        self.entryXpSpin = FloatEdit(self.entryPage)
         self.entryXpSpin.setObjectName("entryXpSpin")
         self.formLayout_2.setWidget(1, QtWidgets.QFormLayout.FieldRole, self.entryXpSpin)
         self.entryEndCheck = QtWidgets.QCheckBox(self.entryPage)
@@ -191,3 +191,5 @@ class Ui_MainWindow(object):
 from toolset.gui.widgets.edit.combobox_2da import ComboBox2DA
 from toolset.gui.widgets.edit.locstring import LocalizedStringLineEdit
 from toolset.gui.widgets.edit.plaintext import HTPlainTextEdit
+from toolset.gui.widgets.edit.float_edit import FloatEdit
+from toolset.gui.widgets.long_spinbox import LongSpinBox

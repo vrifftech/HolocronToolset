@@ -116,13 +116,14 @@ class TLKEditor(Editor):
         self.change_language(language)
 
     def change_language(self, language: Language):
-        self.language = language
-        self.language_id = int(language)
-        if not self._revert:
-            return
-        tlk: TLK = read_tlk(self._revert, language=language)
+        tlk = self._build_tlk()
+        tlk.language = language
+        for _, entry in tlk:
+            if entry._text_bytes is not None:
+                entry.set_text_bytes(entry._text_bytes, tlk.encoding)
+        data = bytes_tlk(tlk)
         self._extracted_from_new_2()
-        dialog = LoaderDialog(self, bytes_tlk(tlk), self.model)
+        dialog = LoaderDialog(self, data, self.model)
         self._extracted_from_load_10(dialog)
 
     def load(self, filepath: os.PathLike | str, resref: str, restype: ResourceType, data: bytes):
@@ -194,6 +195,12 @@ class TLKEditor(Editor):
             - Write the TLK object to a byte array
             - Return the byte array and an empty bytes object as a tuple.
         """
+        tlk = self._build_tlk()
+        data = bytearray()
+        write_tlk(tlk, data, self._restype or ResourceType.TLK)
+        return data, b""
+
+    def _build_tlk(self) -> TLK:
         tlk = TLK()
         tlk.language_id = self.language_id
         tlk.version = self.version
@@ -210,9 +217,7 @@ class TLKEditor(Editor):
                 entry.replace(sound_resref=sound)
             tlk.entries.append(entry)
 
-        data = bytearray()
-        write_tlk(tlk, data, self._restype or ResourceType.TLK)
-        return data, b""
+        return tlk
 
     def insert(self):
         self.model.appendRow([QStandardItem(""), QStandardItem("")])

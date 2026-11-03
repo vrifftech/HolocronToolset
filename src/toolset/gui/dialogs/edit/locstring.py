@@ -15,6 +15,7 @@ class LocalizedStringDialog(QDialog):
 
         self.ui = Ui_Dialog()
         self.ui.setupUi(self)
+        self.ui.stringrefSpin.setRange(-1, 0xFFFFFFFE)
         table_language = installation.talktable().language()
         language_name = table_language.name.title() if isinstance(table_language, Language) else f"Language {table_language}"
         self.setWindowTitle(f"{language_name} - {installation.name} - Localized String Editor")
@@ -42,17 +43,19 @@ class LocalizedStringDialog(QDialog):
         self._installation = installation
         self.locstring = deepcopy(locstring)
         self.ui.stringrefSpin.setValue(locstring.stringref)
+        self.stringrefChanged(locstring.stringref)
 
     def accept(self):
         if self.locstring.stringref != -1:
+            index = self.locstring.stringref & 0xFFFFFF
             tlk_path = CaseAwarePath(self._installation.path(), "dialog.tlk")
             tlk = read_tlk(tlk_path)
-            created = len(tlk) <= self.locstring.stringref
+            created = len(tlk) <= index
             if created:
-                tlk.resize(self.locstring.stringref + 1)
-            entry = tlk.get(self.locstring.stringref)
+                tlk.resize(index + 1)
+            entry = tlk.get(index)
             text = self.ui.stringEdit.toPlainText()
-            if created or entry.text != text:
+            if created or self._tlk_text != text:
                 entry.replace(text=text)
                 write_tlk(tlk, tlk_path)
         super().accept()
@@ -68,6 +71,7 @@ class LocalizedStringDialog(QDialog):
             self._update_text()
         else:
             self.ui.stringEdit.setPlainText(self._installation.talktable().string(stringref))
+            self._tlk_text = self.ui.stringEdit.toPlainText()
 
     def newTlkString(self):
         self.ui.stringrefSpin.setValue(self._installation.talktable().size())

@@ -450,7 +450,7 @@ class Editor(QMainWindow):
             setText(text if text != "-1" else "")
             textbox.setStyleSheet(className + " {background-color: white;}")
         else:
-            setText(self._installation.talktable().string(locstring.stringref))
+            setText(self._installation.string(locstring))
             textbox.setStyleSheet(className + " {background-color: #fffded;}")
 
     def filepath(self) -> str | None:

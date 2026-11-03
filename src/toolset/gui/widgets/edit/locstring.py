@@ -56,7 +56,7 @@ class LocalizedStringLineEdit(QWidget):
             - Sets the internal locstring property to the passed in value
             - Checks if the stringref is -1
             - If so, sets the text directly from the string and uses white background
-            - If not, looks up the string from the talktable and uses a yellow background
+            - If not, resolves the text for the installation and uses a yellow background
         """
         self._locstring = locstring
         if locstring.stringref == -1:
@@ -64,7 +64,7 @@ class LocalizedStringLineEdit(QWidget):
             self.ui.locstringText.setText(text if text != "-1" else "")
             self.ui.locstringText.setStyleSheet("QLineEdit {background-color: white;}")
         else:
-            self.ui.locstringText.setText(self._installation.talktable().string(locstring.stringref))
+            self.ui.locstringText.setText(self._installation.string(locstring))
             self.ui.locstringText.setStyleSheet("QLineEdit {background-color: #fffded;}")
 
     def editLocstring(self):
