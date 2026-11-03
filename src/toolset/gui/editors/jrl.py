@@ -73,7 +73,7 @@ class JRLEditor(Editor):
         self.ui.categoryPlotSpin.editingFinished.connect(self.onValueUpdated)
         self.ui.categoryPlanetSelect.activated.connect(self.onValueUpdated)
         self.ui.categoryPrioritySelect.activated.connect(self.onValueUpdated)
-        self.ui.categoryCommentEdit.keyReleased.connect(self.onValueUpdated)
+        self.ui.categoryCommentEdit.textChanged.connect(self.onCommentUpdated)
         self.ui.entryIdSpin.editingFinished.connect(self.onValueUpdated)
         self.ui.entryXpSpin.editingFinished.connect(self.onValueUpdated)
         self.ui.entryEndCheck.clicked.connect(self.onValueUpdated)
@@ -217,13 +217,15 @@ class JRLEditor(Editor):
             data.plot_index = self.ui.categoryPlotSpin.value()
             data.planet_id = self.ui.categoryPlanetSelect.currentIndex() - 1
             data.priority = JRLQuestPriority(self.ui.categoryPrioritySelect.currentData())
-            data.comment = self.ui.categoryCommentEdit.toPlainText()
         elif isinstance(data, JRLEntry):
             data.text = self.ui.entryTextEdit.locstring
             data.end = self.ui.entryEndCheck.isChecked()
             data.xp_percentage = self.ui.entryXpSpin.value()
             data.entry_id = self.ui.entryIdSpin.value()
             self.refreshEntryItem(item)
+
+    def onCommentUpdated(self):
+        self._get_item().data().comment = self.ui.categoryCommentEdit.toPlainText()
 
     def onSelectionChanged(self, selection: QItemSelection, deselected: QItemSelection):
         """Updates UI on journal tree selection change.

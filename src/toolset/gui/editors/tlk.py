@@ -85,8 +85,8 @@ class TLKEditor(Editor):
         #self.ui.actionAuto_detect_slower.triggered.connect()
 
         self.ui.talkTable.clicked.connect(self.selectionChanged)
-        self.ui.textEdit.textChanged.connect(self.updateEntry)
-        self.ui.soundEdit.textChanged.connect(self.updateEntry)
+        self.ui.textEdit.textChanged.connect(lambda: self.updateEntry(0))
+        self.ui.soundEdit.textChanged.connect(lambda: self.updateEntry(1))
 
         self.populateLanguageMenu()
 
@@ -274,15 +274,15 @@ class TLKEditor(Editor):
             self.ui.textEdit.blockSignals(text_blocked)
             self.ui.soundEdit.blockSignals(sound_blocked)
 
-    def updateEntry(self):
+    def updateEntry(self, column: int):
         selected = self.ui.talkTable.selectedIndexes()
         if not selected:
             return
         sourceIndex = self.proxyModel.mapToSource(selected[0])
         item = self.model.item(sourceIndex.row(), 0)
         sound_item = self.model.item(sourceIndex.row(), 1)
-        text = self.ui.textEdit.toPlainText()
-        sound = self.ui.soundEdit.text()
+        text = self.ui.textEdit.toPlainText() if column == 0 else item.text()
+        sound = self.ui.soundEdit.text() if column == 1 else sound_item.text()
         entry = item.data(ENTRY_ROLE)
         if entry is not None:
             entry = entry.copy()

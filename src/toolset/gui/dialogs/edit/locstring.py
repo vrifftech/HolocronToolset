@@ -31,7 +31,9 @@ class LocalizedStringDialog(QDialog):
             self.ui.languageSelect.setCurrentIndex(self.ui.languageSelect.findData(int(language)))
             self.ui.femaleRadio.setChecked(gender is Gender.FEMALE)
             self.ui.maleRadio.setChecked(gender is Gender.MALE)
+        self.ui.textSourceCombo.setCurrentIndex(int(locstring.stringref != -1 and not locstring._substrings))
 
+        self.ui.textSourceCombo.currentIndexChanged.connect(self.sourceChanged)
         self.ui.stringrefSpin.valueChanged.connect(self.stringrefChanged)
         self.ui.stringrefNewButton.clicked.connect(self.newTlkString)
         self.ui.stringrefNoneButton.clicked.connect(self.noTlkString)
@@ -46,7 +48,7 @@ class LocalizedStringDialog(QDialog):
         self.stringrefChanged(locstring.stringref)
 
     def accept(self):
-        if self.locstring.stringref != -1:
+        if self.ui.textSourceCombo.currentIndex() == 1:
             index = self.locstring.stringref & 0xFFFFFF
             tlk_path = CaseAwarePath(self._installation.path(), "dialog.tlk")
             tlk = read_tlk(tlk_path)
@@ -64,17 +66,24 @@ class LocalizedStringDialog(QDialog):
         super().reject()
 
     def stringrefChanged(self, stringref: int):
-        self.ui.substringFrame.setVisible(stringref == -1)
         self.locstring.stringref = stringref
-
+        self.ui.textSourceCombo.model().item(1).setEnabled(stringref != -1)
         if stringref == -1:
+            self.ui.textSourceCombo.setCurrentIndex(0)
+        self.sourceChanged()
+
+    def sourceChanged(self):
+        embedded = self.ui.textSourceCombo.currentIndex() == 0
+        self.ui.substringFrame.setVisible(embedded)
+        if embedded:
             self._update_text()
         else:
-            self.ui.stringEdit.setPlainText(self._installation.talktable().string(stringref))
+            self.ui.stringEdit.setPlainText(self._installation.talktable().string(self.locstring.stringref))
             self._tlk_text = self.ui.stringEdit.toPlainText()
 
     def newTlkString(self):
         self.ui.stringrefSpin.setValue(self._installation.talktable().size())
+        self.ui.textSourceCombo.setCurrentIndex(1)
 
     def noTlkString(self):
         self.ui.stringrefSpin.setValue(-1)
@@ -95,7 +104,7 @@ class LocalizedStringDialog(QDialog):
         self.ui.stringEdit.blockSignals(previous)
 
     def stringEdited(self):
-        if self.locstring.stringref == -1:
+        if self.ui.textSourceCombo.currentIndex() == 0:
             language = self.ui.languageSelect.currentData()
             gender = Gender(int(self.ui.femaleRadio.isChecked()))
             self.locstring.set_data(language, gender, self.ui.stringEdit.toPlainText())

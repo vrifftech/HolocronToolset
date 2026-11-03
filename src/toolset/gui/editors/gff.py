@@ -120,7 +120,7 @@ class GFFEditor(Editor):
         self.ui.intSpin.editingFinished.connect(self.updateData)
         self.ui.floatSpin.editingFinished.connect(self.updateData)
         self.ui.lineEdit.editingFinished.connect(self.updateData)
-        self.ui.textEdit.textChanged.connect(self.updateData)
+        self.ui.textEdit.textChanged.connect(self.updateString)
         self.ui.xVec3Spin.editingFinished.connect(self.updateData)
         self.ui.yVec3Spin.editingFinished.connect(self.updateData)
         self.ui.zVec3Spin.editingFinished.connect(self.updateData)
@@ -164,7 +164,7 @@ class GFFEditor(Editor):
         """
         super().load(filepath, resref, restype, data)
         gff: GFF = read_gff(data)
-        self._content = gff.content if gff._binary_data else None
+        self._content = gff.content if gff._content_type_known else None
         self._binary_data = gff._binary_data
 
         self.model.clear()
@@ -361,11 +361,11 @@ class GFFEditor(Editor):
             - Gets the item from the source model using the source index
             - Loads the selected item into the UI.
         """
-        proxyIndex = selected.indexes()[0]
-        sourceIndex = self.proxyModel.mapToSource(proxyIndex)
-        item = self.model.itemFromIndex(sourceIndex)
-        assert item is not None
-        self.loadItem(item)
+        for proxyIndex in selected.indexes():
+            sourceIndex = self.proxyModel.mapToSource(proxyIndex)
+            item = self.model.itemFromIndex(sourceIndex)
+            assert item is not None
+            self.loadItem(item)
 
     def loadItem(self, item: QListWidgetItem):
         """Load item into UI widgets.
@@ -442,7 +442,7 @@ class GFFEditor(Editor):
                     if self.ui.substringLangCombo.findData(int(language)) == -1:
                         self.ui.substringLangCombo.addItem(f"Language {language}", int(language))
                     item = QListWidgetItem(f"{language.name.title() if isinstance(language, Language) else f'Language {language}'}, {gender.name.title()}")
-                    item.setData(text, _TEXT_SUBSTRING_ROLE)
+                    item.setData(_TEXT_SUBSTRING_ROLE, text)
                     item.setData(_ID_SUBSTRING_ROLE, LocalizedString.substring_id(language, gender))
                     self.ui.substringList.addItem(item)
 
@@ -486,8 +486,6 @@ class GFFEditor(Editor):
         elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.ResRef:
             if str(item.data(_VALUE_NODE_ROLE)) != self.ui.lineEdit.text():
                 item.setData(ResRef(self.ui.lineEdit.text()), _VALUE_NODE_ROLE)
-        elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.String:
-            item.setData(self.ui.textEdit.toPlainText(), _VALUE_NODE_ROLE)
         elif item.data(_TYPE_NODE_ROLE) == GFFFieldType.Vector3:
             vec3 = Vector3(self.ui.xVec3Spin.value(), self.ui.yVec3Spin.value(), self.ui.zVec3Spin.value())
             item.setData(vec3, _VALUE_NODE_ROLE)
@@ -502,11 +500,19 @@ class GFFEditor(Editor):
         assert item is not None
         self.refreshItemText(item)
 
+    def updateString(self):
+        for proxyIndex in self.ui.treeView.selectedIndexes():
+            item = self.model.itemFromIndex(self.proxyModel.mapToSource(proxyIndex))
+            item.setData(self.ui.textEdit.toPlainText(), _VALUE_NODE_ROLE)
+            self.refreshItemText(item)
+
     def substringSelected(self):
         if len(self.ui.substringList.selectedItems()) > 0:
             item: QListWidgetItem = self.ui.substringList.selectedItems()[0]
             self.ui.substringEdit.setEnabled(True)
+            blocker = QtCore.QSignalBlocker(self.ui.substringEdit)
             self.ui.substringEdit.setPlainText(item.data(_TEXT_SUBSTRING_ROLE))
+            del blocker
         else:
             self.ui.substringEdit.setEnabled(False)
 
@@ -528,7 +534,7 @@ class GFFEditor(Editor):
         """
         item: QListWidgetItem = self.ui.substringList.selectedItems()[0]
         text: str = self.ui.substringEdit.toPlainText()
-        item.setData(text, _TEXT_SUBSTRING_ROLE)
+        item.setData(_TEXT_SUBSTRING_ROLE, text)
 
         substringItem: QListWidgetItem = self.ui.substringList.selectedItems()[0]
         language, gender = LocalizedString.substring_pair(substringItem.data(_ID_SUBSTRING_ROLE))
