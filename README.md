@@ -135,17 +135,6 @@ python -m pytest tests
 Set `K1_PATH` and `K2_PATH` when testing against local game installations.
 Qt/OpenGL interactions and executable builds require their platform dependencies.
 
-Module Designer opens directly and edits existing modules through its 2D and
-3D views. Select a module in the Modules tab, then click
-`Open Module in 3D Editor` in the sidebar to edit it directly.
-`Tools > 3D Module Designer` opens the installed-module picker.
-Standalone RIM and GIT files may lack the models, textures, and walkmeshes
-required for 3D editing.
-Generated UI and resource modules are committed because the application
-imports them directly.
-
-`src/toolset/data/instance_history.py` implements undo/redo for KotOR Game
-Instance Table (GIT) records, shared by the GIT editor and Module Designer.
 
 The Help menu opens bundled documentation and links to the project and communities.
 
