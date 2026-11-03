@@ -25,11 +25,13 @@ def convert_texture(source: TPC, target: TPCTextureFormat, report) -> TPC:
             report(progress, "set_value")
         converted.append(mipmaps)
     first = images[0].mipmaps[0]
-    settings = source.effective_txi.settings()
+    settings = source.effective_txi.settings(game=source.header.game)
     candidate = deepcopy(source)
     embedded = deepcopy(candidate.embedded_txi)
     candidate.set_images(first.width, first.height, converted, target, kind=images[0].kind,
                          numx=settings.texture["numx"], numy=settings.texture["numy"],
-                         declared_mipmap_count=source.header.mipmap_count)
+                         declared_mipmap_count=(len(images[0].mipmaps)
+                                               if source.format() in (TPCTextureFormat.PVRTC4_RGB, TPCTextureFormat.PVRTC4_RGBA)
+                                               else source.header.mipmap_count))
     candidate.embedded_txi = embedded
     return candidate

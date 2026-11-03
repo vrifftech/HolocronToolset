@@ -103,7 +103,8 @@ class TPCEditor(Editor):
     def load(self, filepath: os.PathLike | str, resref: str, restype: ResourceType, data: bytes):
         super().load(filepath, resref, restype, data)
         if restype in (ResourceType.TPC, ResourceType.TGA):
-            self._tpc = read_tpc(data, file_format=restype)
+            game = self._installation.game() if self._installation is not None else 1
+            self._tpc = read_tpc(data, file_format=restype, game=game)
             path = Path(filepath)
             if path.suffix.lower() in (".tpc", ".tga"):
                 sidecar = CaseAwarePath.get_case_sensitive_path(path.with_suffix(".txi"))
@@ -149,8 +150,9 @@ class TPCEditor(Editor):
         self.formatStatus.setText(f"Stored: {self._tpc.format().name}")
         self.formatSelect.blockSignals(True)
         self.formatSelect.clear()
-        for texture_format in (TPCTextureFormat.Greyscale, TPCTextureFormat.RGB, TPCTextureFormat.RGBA,
-                               TPCTextureFormat.DXT1, TPCTextureFormat.DXT5):
+        for texture_format in dict.fromkeys((self._tpc.format(), TPCTextureFormat.Greyscale,
+                                            TPCTextureFormat.RGB, TPCTextureFormat.RGBA,
+                                            TPCTextureFormat.DXT1, TPCTextureFormat.DXT5)):
             if images[0].kind != "frame" or texture_format in (self._tpc.format(), TPCTextureFormat.DXT1, TPCTextureFormat.DXT5):
                 self.formatSelect.addItem(texture_format.name, texture_format)
         self.formatSelect.setCurrentIndex(self.formatSelect.findData(self._tpc.format()))
@@ -217,7 +219,7 @@ class TPCEditor(Editor):
         # Validate a candidate before replacing either source document.
         candidate = TXI(bytes(self._document()))
         candidate.update_text(self.ui.txiEdit.toPlainText())
-        candidate.settings()
+        candidate.settings(game=self._tpc.header.game)
         if self._txi_source == "external":
             self._tpc.external_txi = candidate
             self._external_dirty = True
