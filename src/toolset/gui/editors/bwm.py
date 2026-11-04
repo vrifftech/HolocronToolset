@@ -137,6 +137,7 @@ class BWMEditor(Editor):
 
         self._bwm = read_bwm(data)
         self.ui.renderArea.setWalkmeshes([self._bwm])
+        self.ui.renderArea.centerCamera()
 
         def addTransItem(face, edge, transition):
             if transition is not None:
