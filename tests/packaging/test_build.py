@@ -331,7 +331,7 @@ class DistributionTests(unittest.TestCase):
         popen.assert_not_called()
 
     def test_project_version_matches_the_frontend(self):
-        self.assertEqual(version_info.project_version(ROOT), "4.0.0b3")
+        self.assertEqual(version_info.project_version(ROOT), "4.0.0b4")
 
     def test_failed_frozen_check_keeps_its_diagnostic(self):
         def failed(command, **kwargs):
@@ -346,7 +346,7 @@ class DistributionTests(unittest.TestCase):
         for name in ("FixedFileInfo", "StringFileInfo", "StringStruct", "StringTable", "VarFileInfo", "VarStruct", "VSVersionInfo"):
             setattr(module, name, lambda *args, **kwargs: SimpleNamespace(args=args, kwargs=kwargs))
         with patch.dict(sys.modules, {module.__name__: module}):
-            result = version_info.make_windows_version_info("4.0.0b3")
+            result = version_info.make_windows_version_info("4.0.0b4")
         ffi = result.kwargs["ffi"].kwargs
         self.assertEqual(ffi["filevers"], (4, 0, 0, 0))
         self.assertEqual(ffi["flags"], 0x02)

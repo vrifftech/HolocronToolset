@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "HolocronToolset"
-version = "4.0.0b3"
+version = "4.0.0b4"
 description = "Standalone HolocronToolset frontend for the separately supplied audited PyKotor backend"
 requires-python = ">=3.10"
 dependencies = [
