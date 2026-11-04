@@ -33,6 +33,9 @@ bootstrap_backend()
 
 # CLI-selected editors and Qt-generated form imports must remain available.
 hidden = ["ply.lex", "ply.yacc"]
+if sys.platform.startswith("linux"):
+    # PyOpenGL selects GLX or EGL from the user's display session at runtime.
+    hidden.extend(["OpenGL.platform.glx", "OpenGL.platform.egl"])
 for path in (root / "src/toolset").rglob("*.py"):
     relative = path.relative_to(root / "src")
     if any(part in {"__pycache__", "help"} for part in relative.parts[:-1]):
