@@ -11,6 +11,7 @@ class CameraDialog(QDialog):
 
         self.ui = Ui_Dialog()
         self.ui.setupUi(self)
+        self.ui.cameraIdSpin.setRange(-0x80000000, 0x7FFFFFFF)
 
         self.setWindowTitle("Edit Camera")
         self.setWindowIcon(QIcon(QPixmap(":/images/icons/k1/camera.png")))
