@@ -14,15 +14,15 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(274, 401)
+        MainWindow.resize(800, 600)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.centralwidget)
         self.verticalLayout.setObjectName("verticalLayout")
-        self.textureImage = QtWidgets.QLabel(self.centralwidget)
+        self.textureImage = QtWidgets.QGraphicsView(self.centralwidget)
         self.textureImage.setFrameShape(QtWidgets.QFrame.Box)
         self.textureImage.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.textureImage.setText("")
+        self.textureImage.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.textureImage.setAlignment(QtCore.Qt.AlignCenter)
         self.textureImage.setObjectName("textureImage")
         self.verticalLayout.addWidget(self.textureImage)

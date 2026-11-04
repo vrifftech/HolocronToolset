@@ -183,6 +183,7 @@ class ToolWindow(QMainWindow):
         self.ui.texturesWidget.requestOpenResource.connect(self.onOpenResources)
 
         self.ui.extractButton.clicked.connect(lambda: self.onExtractResources(self.getActiveResourceWidget().selectedResources()))
+        self.ui.extractAllButton.clicked.connect(lambda: self.onExtractResources(self.getActiveResourceWidget().allResources()))
         self.ui.openButton.clicked.connect(lambda: self.onOpenResources(self.getActiveResourceWidget().selectedResources()))
 
         self.ui.openAction.triggered.connect(self.openFromFile)

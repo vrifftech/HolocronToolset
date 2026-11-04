@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
 from pykotor.common.stream import BinaryReader
 from pykotor.extract.file import ResourceIdentifier
 from pykotor.tools import sound
 from PyQt5 import QtCore
-from PyQt5.QtCore import QBuffer, QIODevice
+from PyQt5.QtCore import QUrl
 from PyQt5.QtMultimedia import QMediaContent, QMediaPlayer
 from PyQt5.QtWidgets import QFileDialog, QMainWindow, QWidget
 
@@ -28,7 +30,7 @@ class AudioPlayer(QMainWindow):
         self.ui.setupUi(self)
 
         self.player: QMediaPlayer = QMediaPlayer(self)
-        self.buffer: QBuffer = QBuffer(self)
+        self._mediaDirectory = TemporaryDirectory(prefix="HolocronToolset-audio-")
 
         self.ui.actionOpen.triggered.connect(self.open)
         self.ui.stopButton.clicked.connect(self.player.stop)
@@ -42,12 +44,13 @@ class AudioPlayer(QMainWindow):
         data = sound.deobfuscate_audio(data)
 
         self.player.stop()
-        self.buffer = QBuffer(self)
-        self.buffer.setData(data)
+        self.player.setMedia(QMediaContent())
+        extension = "wav" if data.startswith(b"RIFF") else "mp3"
+        media_path = Path(self._mediaDirectory.name) / f"preview.{extension}"
+        media_path.write_bytes(data)
         self.setWindowTitle(f"{resname}.{restype.extension} - Audio Player")
-        if self.buffer.open(QIODevice.ReadOnly):
-            self.player.setMedia(QMediaContent(), self.buffer)
-            QtCore.QTimer.singleShot(0, self.player.play)
+        self.player.setMedia(QMediaContent(QUrl.fromLocalFile(str(media_path))))
+        QtCore.QTimer.singleShot(0, self.player.play)
 
     def open(self):
         filepath: str = QFileDialog.getOpenFileName(self, "Select an audio file")[0]
@@ -77,3 +80,4 @@ class AudioPlayer(QMainWindow):
 
     def closeEvent(self, e: QCloseEvent | None):
         self.player.stop()
+        self.player.setMedia(QMediaContent())

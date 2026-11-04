@@ -208,14 +208,11 @@ class UTIEditor(Editor):
 
     def _add_property_main(self, propertyId, subtypeId):
         """Adds a property to an item."""
-        itemprops: TwoDA = self._installation.htGetCache2DA(HTInstallation.TwoDA_ITEM_PROPERTIES)
-
         utiProperty = UTIProperty()
         utiProperty.property_name = propertyId
         utiProperty.subtype = subtypeId
-        utiProperty.cost_table = itemprops.get_row(propertyId).get_integer("costtableresref", 255)
+        utiProperty.cost_table, utiProperty.param1 = self.propertyTables(self._installation, propertyId, subtypeId)
         utiProperty.cost_value = 0
-        utiProperty.param1 = itemprops.get_row(propertyId).get_integer("param1resref", 255)
         utiProperty.param1_value = 0
         utiProperty.chance_appear = 100
 
@@ -233,7 +230,8 @@ class UTIEditor(Editor):
         """Retrieve the property, subproperty and cost names from the UTIEditor."""
         propName: str = UTIEditor.propertyName(self._installation, utiProperty.property_name)
         subpropName: str | None = UTIEditor.subpropertyName(self._installation, utiProperty.property_name, utiProperty.subtype)
-        costName: str | None = UTIEditor.costName(self._installation, utiProperty.cost_table, utiProperty.cost_value)
+        cost_table, _ = self.propertyTables(self._installation, utiProperty.property_name, utiProperty.subtype)
+        costName: str | None = UTIEditor.costName(self._installation, cost_table, utiProperty.cost_value)
 
         if costName and subpropName:
             return f"{propName}: {subpropName} [{costName}]"
@@ -285,6 +283,24 @@ class UTIEditor(Editor):
         )
 
     @staticmethod
+    def propertyTables(installation: HTInstallation, prop: int, subprop: int) -> tuple[int, int]:
+        properties = installation.htGetCache2DA(HTInstallation.TwoDA_ITEM_PROPERTIES)
+        definition = properties.get_row(prop)
+        cost = definition.get_integer("costtableresref", 255)
+        param = definition.get_integer("param1resref", 255)
+        subtype_resref = definition.get_string("subtyperesref")
+        if subtype_resref:
+            subtypes = installation.htGetCache2DA(subtype_resref)
+            subtype = subtypes.get_row(subprop)
+            if "costtableresref" in subtypes.get_headers():
+                subtype_cost = subtype.get_integer("costtableresref", 0)
+                if subtype_cost:
+                    cost = subtype_cost
+            if "param1resref" in subtypes.get_headers():
+                param = subtype.get_integer("param1resref", param)
+        return cost, param
+
+    @staticmethod
     def costName(installation: HTInstallation, cost: int, value: int):
         try:
             costtableList: TwoDA = installation.htGetCache2DA(HTInstallation.TwoDA_IPRP_COSTTABLE)
@@ -322,31 +338,34 @@ class PropertyEditor(QDialog):
         self.ui.parameterList.doubleClicked.connect(self.selectParam)
 
         self._installation = installation
-        self._utiProperty: UTIProperty = utiProperty
+        self._utiProperty: UTIProperty = deepcopy(utiProperty)
+        self._costTable, self._paramTable = UTIEditor.propertyTables(
+            installation, utiProperty.property_name, utiProperty.subtype,
+        )
 
         costtableList = installation.htGetCache2DA(HTInstallation.TwoDA_IPRP_COSTTABLE)
-        if utiProperty.cost_table != 0xFF:  # noqa: PLR2004
-            costtable = installation.htGetCache2DA(costtableList.get_cell(utiProperty.cost_table, "name"))
+        if self._costTable != 0xFF:  # noqa: PLR2004
+            costtable = installation.htGetCache2DA(costtableList.get_cell(self._costTable, "name"))
             for i in range(costtable.get_height()):
-                item = QListWidgetItem(UTIEditor.costName(installation, utiProperty.cost_table, i))
+                item = QListWidgetItem(UTIEditor.costName(installation, self._costTable, i))
                 item.setData(QtCore.Qt.UserRole, i)
                 self.ui.costList.addItem(item)
 
-        if utiProperty.param1 != 0xFF:  # noqa: PLR2004
+        if self._paramTable != 0xFF:  # noqa: PLR2004
             paramList = installation.htGetCache2DA(HTInstallation.TwoDA_IPRP_PARAMTABLE)
-            paramtable = installation.htGetCache2DA(paramList.get_cell(utiProperty.param1, "tableresref"))
+            paramtable = installation.htGetCache2DA(paramList.get_cell(self._paramTable, "tableresref"))
             for i in range(paramtable.get_height()):
-                item = QListWidgetItem(UTIEditor.paramName(installation, utiProperty.param1, i))
+                item = QListWidgetItem(UTIEditor.paramName(installation, self._paramTable, i))
                 item.setData(QtCore.Qt.UserRole, i)
                 self.ui.parameterList.addItem(item)
 
         upgrades = installation.htGetCache2DA(HTInstallation.TwoDA_UPGRADES)
-        self.ui.upgradeSelect.addItem("[Not specified]", None)
         self.ui.upgradeSelect.addItem("[No upgrade required]", 0xFF)
         for i in range(upgrades.get_height()):
             text = upgrades.get_cell(i, "label").replace("_" , " ").title()
             self.ui.upgradeSelect.addItem(text, i)
-        self.ui.upgradeSelect.setCurrentIndex(self.ui.upgradeSelect.findData(utiProperty.upgrade_type))
+        upgrade_type = 0xFF if utiProperty.upgrade_type is None else utiProperty.upgrade_type
+        self.ui.upgradeSelect.setCurrentIndex(self.ui.upgradeSelect.findData(upgrade_type))
 
         self.reloadTextboxes()
 
@@ -358,16 +377,17 @@ class PropertyEditor(QDialog):
         subpropertyName: str | None = UTIEditor.subpropertyName(self._installation, self._utiProperty.property_name, self._utiProperty.subtype)
         self.ui.subpropertyEdit.setText(subpropertyName or "")
 
-        costName: str | None = UTIEditor.costName(self._installation, self._utiProperty.cost_table, self._utiProperty.cost_value)
+        costName: str | None = UTIEditor.costName(self._installation, self._costTable, self._utiProperty.cost_value)
         self.ui.costEdit.setText(costName or "")
 
-        paramName: str | None = UTIEditor.paramName(self._installation, self._utiProperty.param1, self._utiProperty.param1_value)
+        paramName: str | None = UTIEditor.paramName(self._installation, self._paramTable, self._utiProperty.param1_value)
         self.ui.parameterEdit.setText(paramName or "")
 
     def selectCost(self):
         if not self.ui.costList.currentItem():
             return
 
+        self._utiProperty.cost_table = self._costTable
         self._utiProperty.cost_value = self.ui.costList.currentItem().data(QtCore.Qt.UserRole)
         self.reloadTextboxes()
 
@@ -375,9 +395,12 @@ class PropertyEditor(QDialog):
         if not self.ui.parameterList.currentItem():
             return
 
+        self._utiProperty.param1 = self._paramTable
         self._utiProperty.param1_value = self.ui.parameterList.currentItem().data(QtCore.Qt.UserRole)
         self.reloadTextboxes()
 
     def utiProperty(self) -> UTIProperty:
-        self._utiProperty.upgrade_type = self.ui.upgradeSelect.currentData()
+        upgrade_type = self.ui.upgradeSelect.currentData()
+        if upgrade_type != 0xFF or self._utiProperty.upgrade_type is not None:
+            self._utiProperty.upgrade_type = upgrade_type
         return self._utiProperty

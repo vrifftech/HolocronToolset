@@ -196,6 +196,16 @@
           </widget>
          </item>
          <item>
+          <widget class="QPushButton" name="extractAllButton">
+           <property name="text">
+            <string>Extract Everything</string>
+           </property>
+           <property name="toolTip">
+            <string>Extract every resource in the current section, including resources hidden by the search filter.</string>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QGroupBox" name="tpcGroup_2">
            <property name="title">
             <string>TPC</string>

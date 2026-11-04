@@ -5,14 +5,13 @@ from toolset.gui.widgets.settings.git import GITSettings
 from toolset.gui.widgets.settings.module_designer import ModuleDesignerSettings
 from pykotor.common.misc import Color
 
-import struct
 from typing import TYPE_CHECKING
 
 from pykotor.common.geometry import SurfaceMaterial, Vector2, Vector3
 from pykotor.resource.formats.bwm import BWM, BWMFace, read_bwm, write_bwm
 from pykotor.resource.type import ResourceType
 from PyQt5 import QtCore
-from PyQt5.QtGui import QColor, QIcon, QImage, QPixmap
+from PyQt5.QtGui import QColor, QIcon, QPixmap
 from PyQt5.QtWidgets import QListWidgetItem, QShortcut, QWidget
 from toolset.gui.editor import Editor
 from utility.error_handling import assert_with_variable_trace
@@ -109,8 +108,9 @@ class BWMEditor(Editor):
         self.ui.materialList.clear()
         for material in self.materialColors:
             color: QColor = self.materialColors[material]
-            image = QImage(struct.pack("BBB", color.red(), color.green(), color.blue()) * 16 * 16, 16, 16, QImage.Format_RGB888)
-            icon = QIcon(QPixmap(image))
+            pixmap = QPixmap(16, 16)
+            pixmap.fill(QColor(color.red(), color.green(), color.blue()))
+            icon = QIcon(pixmap)
             text = material.name.replace("_", " ").title()
             item = QListWidgetItem(icon, text)
             item.setData(QtCore.Qt.UserRole, material)  # type: ignore[attr-defined]

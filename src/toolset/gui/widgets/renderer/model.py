@@ -15,6 +15,7 @@ from toolset.data.settings import settings_signals
 from toolset.data.misc import ControlItem, update_modifiers
 from toolset.gui.widgets.settings.module_designer import ModuleDesignerSettings
 from utility.error_handling import assert_with_variable_trace
+from utility.logger_util import RobustRootLogger
 
 if TYPE_CHECKING:
     from glm import vec3
@@ -262,6 +263,7 @@ class ModelRenderer(QOpenGLWidget):
     def _failRender(self, error):
         if self._renderError is not None:
             return
+        RobustRootLogger().error("Model preview failed", exc_info=(type(error), error, error.__traceback__))
         self._renderError = str(error) or type(error).__name__
         self._renderErrorReported = False
         self._renderTimer.stop()

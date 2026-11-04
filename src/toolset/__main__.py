@@ -58,6 +58,7 @@ def main():
     file_path = args.file.expanduser().resolve() if args.file is not None else None
     game_path = game_path.expanduser().resolve() if game_path is not None else None
     from PyQt5.QtCore import QThread, Qt
+    from PyQt5.QtGui import QSurfaceFormat
     from PyQt5.QtWidgets import QApplication
     # The help browser uses paths relative to the application package.
     os.chdir(Path(__file__).resolve().parent)
@@ -67,6 +68,13 @@ def main():
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    surface_format = QSurfaceFormat()
+    surface_format.setRenderableType(QSurfaceFormat.OpenGL)
+    surface_format.setVersion(*((4, 1) if sys.platform == "darwin" else (3, 3)))
+    surface_format.setProfile(QSurfaceFormat.CoreProfile)
+    surface_format.setDepthBufferSize(24)
+    surface_format.setStencilBufferSize(8)
+    QSurfaceFormat.setDefaultFormat(surface_format)
     app = QApplication([sys.argv[0], *qt_args])
     app.thread().setPriority(QThread.HighestPriority)
     sys.excepthook = onAppCrash

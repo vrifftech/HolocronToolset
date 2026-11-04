@@ -16,6 +16,7 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QAction, QOpenGLWidget, QWidget, QMessageBox
 from utility.error_handling import assert_with_variable_trace
+from utility.logger_util import RobustRootLogger
 
 if TYPE_CHECKING:
     from glm import vec3
@@ -316,6 +317,7 @@ class ModuleRenderer(QOpenGLWidget):
     def _failRender(self, error):
         if self._renderError is not None:
             return
+        RobustRootLogger().error("Module preview failed", exc_info=(type(error), error, error.__traceback__))
         self._renderError = str(error) or type(error).__name__
         self._renderErrorReported = False
         self._renderTimer.stop()

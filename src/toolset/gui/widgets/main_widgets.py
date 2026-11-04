@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from pykotor.resource.formats.tpc import TPCTextureFormat
 from PyQt5 import QtCore
-from PyQt5.QtCore import QModelIndex, QPoint, QSortFilterProxyModel, QThread, QTimer
+from PyQt5.QtCore import QModelIndex, QPoint, QSize, QSortFilterProxyModel, QThread, QTimer
 from PyQt5.QtGui import QIcon, QImage, QPixmap, QResizeEvent, QStandardItem, QStandardItemModel, QTransform
 from PyQt5.QtWidgets import QHeaderView, QMenu, QWidget
 
@@ -26,6 +26,10 @@ class MainWindowList(QWidget):
 
     @abstractmethod
     def selectedResources(self) -> list[FileResource]:
+        ...
+
+    @abstractmethod
+    def allResources(self) -> list[FileResource]:
         ...
 
 
@@ -140,6 +144,9 @@ class ResourceList(MainWindowList):
 
     def selectedResources(self) -> list[FileResource]:
         return self.modulesModel.resourceFromIndexes(self.ui.resourceTree.selectedIndexes())
+
+    def allResources(self) -> list[FileResource]:
+        return self.modulesModel.resourceFromItems(self.modulesModel.allResourcesItems())
 
     def onFilterStringUpdated(self):
         self.modulesModel.proxyModel().setFilterFixedString(self.ui.searchEdit.text())
@@ -269,6 +276,8 @@ class TextureList(MainWindowList):
         from toolset.uic.widgets.texture_list import Ui_Form
         self.ui = Ui_Form()
         self.ui.setupUi(self)
+        self.ui.resourceList.setWordWrap(False)
+        self.ui.resourceList.setTextElideMode(QtCore.Qt.ElideNone)
         self._installation = None
         self._generation = 0
         self._closed = False
@@ -308,8 +317,14 @@ class TextureList(MainWindowList):
         self._worker.generation = self._generation
         self._submitted.clear()
         self.texturesModel.clear()
+        resources = list(resources)
+        metrics = self.ui.resourceList.fontMetrics()
+        text_width = max((metrics.horizontalAdvance(resource.resname()) for resource in resources), default=0)
+        grid_size = QSize(max(64, text_width) + 16, 64 + metrics.height() + 16)
+        self.ui.resourceList.setGridSize(grid_size)
         for resource in resources:
             item = QStandardItem(resource.resname())
+            item.setSizeHint(grid_size)
             item.setToolTip(f"{resource.filepath()} :: {resource.filename()} @ {resource.offset()}")
             item.setData(resource, QtCore.Qt.UserRole + 1)
             self.texturesModel.appendRow(item)
@@ -323,6 +338,10 @@ class TextureList(MainWindowList):
     def selectedResources(self):
         return [self.texturesModel.item(self.texturesProxyModel.mapToSource(index).row()).data(QtCore.Qt.UserRole + 1)
                 for index in self.ui.resourceList.selectedIndexes()]
+
+    def allResources(self):
+        return [self.texturesModel.item(row).data(QtCore.Qt.UserRole + 1)
+                for row in range(self.texturesModel.rowCount())]
 
     def visibleItems(self):
         view = self.ui.resourceList

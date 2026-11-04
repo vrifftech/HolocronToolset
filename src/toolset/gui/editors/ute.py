@@ -7,9 +7,11 @@ from pykotor.common.misc import ResRef
 from pykotor.resource.formats.gff import write_gff
 from pykotor.resource.generics.ute import UTE, UTECreature, dismantle_ute, read_ute
 from pykotor.resource.type import ResourceType
-from PyQt5.QtWidgets import QCheckBox, QDoubleSpinBox, QSpinBox, QTableWidgetItem, QWidget
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QCheckBox, QSpinBox, QTableWidgetItem, QWidget
 from toolset.data.installation import HTInstallation
 from toolset.gui.editor import Editor
+from toolset.gui.widgets.edit.float_edit import FloatEdit
 
 if TYPE_CHECKING:
     import os
@@ -20,9 +22,9 @@ if TYPE_CHECKING:
 
 class UTEEditor(Editor):
     def __init__(self, parent: QWidget | None, installation: HTInstallation | None = None):
-        """Initialize the trigger editor window."""
+        """Initialize the encounter editor window."""
         supported: list[ResourceType] = [ResourceType.UTE]
-        super().__init__(parent, "Trigger Editor", "trigger", supported, supported, installation)
+        super().__init__(parent, "Encounter Editor", "encounter", supported, supported, installation)
 
         from toolset.uic.editors.ute import Ui_MainWindow
         self.ui = Ui_MainWindow()
@@ -56,7 +58,7 @@ class UTEEditor(Editor):
         self.ui.difficultySelect.setItems(difficulties.get_column("label"))
 
         self.ui.factionSelect.clear()
-        self.ui.difficultySelect.setItems(factions.get_column("label"))
+        self.ui.factionSelect.setItems(factions.get_column("label"))
 
 
     def load(self, filepath: os.PathLike | str, resref: str, restype: ResourceType, data: bytes):
@@ -143,7 +145,7 @@ class UTEEditor(Editor):
         ute.creatures = []
         for i in range(self.ui.creatureTable.rowCount()):
             singleCheckbox: QCheckBox = self.ui.creatureTable.cellWidget(i, 0)
-            challengeSpin: QDoubleSpinBox = self.ui.creatureTable.cellWidget(i, 1)
+            challengeSpin: FloatEdit = self.ui.creatureTable.cellWidget(i, 1)
             appearanceSpin: QSpinBox = self.ui.creatureTable.cellWidget(i, 2)
 
             original = self.ui.creatureTable.item(i, 3).data(QtCore.Qt.UserRole)
@@ -223,9 +225,10 @@ class UTEEditor(Editor):
 
         singleCheckbox = QCheckBox()
         singleCheckbox.setChecked(single)
-        challengeSpin = QDoubleSpinBox()
+        challengeSpin = FloatEdit()
         challengeSpin.setValue(challenge)
         appearanceSpin = QSpinBox()
+        appearanceSpin.setRange(-2147483648, 2147483647)
         appearanceSpin.setValue(appearanceId)
 
         self.ui.creatureTable.setCellWidget(rowId, 0, singleCheckbox)

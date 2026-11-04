@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>274</width>
-    <height>401</height>
+    <width>800</width>
+    <height>600</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,15 +16,15 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <widget class="QLabel" name="textureImage">
+     <widget class="QGraphicsView" name="textureImage">
       <property name="frameShape">
        <enum>QFrame::Box</enum>
       </property>
       <property name="frameShadow">
        <enum>QFrame::Sunken</enum>
       </property>
-      <property name="text">
-       <string/>
+      <property name="dragMode">
+       <enum>QGraphicsView::ScrollHandDrag</enum>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>

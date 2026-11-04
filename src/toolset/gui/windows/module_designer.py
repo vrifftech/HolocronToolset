@@ -41,6 +41,7 @@ from toolset.gui.widgets.settings.module_designer import ModuleDesignerSettings
 from toolset.gui.windows.help import HelpWindow
 from toolset.utils.misc import QtMouse
 from toolset.utils.window import openResourceEditor
+from utility.logger_util import RobustRootLogger
 
 if TYPE_CHECKING:
     from glm import vec3
@@ -219,6 +220,7 @@ class ModuleDesigner(QMainWindow):
                     if mesh is not None:
                         walkmeshes.append(mesh)
         except Exception as error:
+            RobustRootLogger().exception("Unable to load module '%s'", root)
             QMessageBox.critical(self, "Cannot open module", str(error))
             return
         self.unloadModule()

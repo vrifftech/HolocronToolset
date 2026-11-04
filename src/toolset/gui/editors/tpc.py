@@ -6,8 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image, ImageOps
+from PyQt5.QtCore import QSize, Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap, QTransform
-from PyQt5.QtWidgets import QComboBox, QFileDialog, QLabel, QPushButton, QHBoxLayout, QMessageBox
+from PyQt5.QtWidgets import QComboBox, QFileDialog, QGraphicsScene, QLabel, QPushButton, QHBoxLayout, QMessageBox, QSizePolicy
 
 from pykotor.extract.capsule import Capsule
 from pykotor.resource.formats.tpc import TPC, TPCTextureFormat, read_tpc, write_tpc
@@ -30,6 +31,8 @@ class TPCEditor(Editor):
         from toolset.uic.editors.tpc import Ui_MainWindow
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self._textureScene = QGraphicsScene(self.ui.textureImage)
+        self.ui.textureImage.setScene(self._textureScene)
         self._setupMenus()
         self._tpc = TPC()
         self._image_index = 0
@@ -39,6 +42,7 @@ class TPCEditor(Editor):
         self._external_dirty = False
         self._setupSignals()
         self.new()
+        self.resize(self.size().boundedTo(self.screen().availableGeometry().size() - QSize(40, 80)))
 
     def _setupSignals(self):
         # Keep the original viewer; add explicit selection rather than flattening
@@ -50,6 +54,11 @@ class TPCEditor(Editor):
         selection.addWidget(QLabel("Mip", self))
         self.mipmapSelect = QComboBox(self)
         selection.addWidget(self.mipmapSelect)
+        self.zoomSelect = QComboBox(self)
+        self.zoomSelect.addItem("Fit to window", True)
+        self.zoomSelect.addItem("100%", False)
+        selection.addWidget(self.zoomSelect)
+        self.zoomSelect.currentIndexChanged.connect(self._updateImageScale)
         self.ui.verticalLayout.insertLayout(0, selection)
         formats = QHBoxLayout()
         self.formatStatus = QLabel(self)
@@ -76,6 +85,11 @@ class TPCEditor(Editor):
         self.embedTxiButton.clicked.connect(self._embedExternalTxi)
         self.formatSelect.currentIndexChanged.connect(self._updateConversionState)
         self.convertButton.clicked.connect(self._convertTexture)
+        self.formatStatus.setWordWrap(True)
+        for combo in (self.imageSelect, self.mipmapSelect, self.zoomSelect, self.formatSelect, self.txiSourceSelect):
+            combo.setMinimumContentsLength(1)
+            combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+            combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def _updateConversionState(self):
         self.convertButton.setEnabled(bool(self._tpc.images()[0].mipmaps) and
@@ -183,8 +197,9 @@ class TPCEditor(Editor):
         if self._tpc.mipmap_count(index):
             self._selectMipmap(0)
         else:
-            self.ui.textureImage.clear()
-            self.ui.textureImage.setText("The header declares no mipmaps to preview.")
+            self._textureScene.clear()
+            self._textureScene.addText("The header declares no mipmaps to preview.")
+            self._updateImageScale()
 
     def _selectMipmap(self, index: int):
         if index < 0:
@@ -194,12 +209,30 @@ class TPCEditor(Editor):
             width, height, pixels = self._tpc.convert(TPCTextureFormat.RGBA, index, image=self._image_index)
             image = QImage(bytes(pixels), width, height, width * 4, QImage.Format_RGBA8888).copy()
             pixmap = QPixmap.fromImage(image).transformed(QTransform().scale(1, -1))
-            self.ui.textureImage.setPixmap(pixmap)
+            self._textureScene.clear()
+            self._textureScene.addPixmap(pixmap)
+            self._updateImageScale()
         except ValueError as error:
             # The source remains loaded and preservable; do not fabricate pixels
             # for an out-of-range native image view.
-            self.ui.textureImage.clear()
-            self.ui.textureImage.setText(str(error))
+            self._textureScene.clear()
+            self._textureScene.addText(str(error))
+            self._updateImageScale()
+
+    def _updateImageScale(self):
+        view = self.ui.textureImage
+        fit = self.zoomSelect.currentData()
+        scrollbars = Qt.ScrollBarAlwaysOff if fit else Qt.ScrollBarAsNeeded
+        view.setHorizontalScrollBarPolicy(scrollbars)
+        view.setVerticalScrollBarPolicy(scrollbars)
+        view.setSceneRect(self._textureScene.itemsBoundingRect())
+        view.resetTransform()
+        if fit:
+            view.fitInView(view.sceneRect(), Qt.KeepAspectRatio)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        QTimer.singleShot(0, self._updateImageScale)
 
     def _document(self) -> TXI:
         return self._tpc.external_txi if self._txi_source == "external" else self._tpc.embedded_txi
