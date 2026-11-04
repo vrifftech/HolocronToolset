@@ -4,10 +4,16 @@ import math
 from typing import TYPE_CHECKING
 
 from pykotor.common.geometry import Vector2
+from pykotor.common.misc import Game
+from pykotor.common.module import Module
 from pykotor.common.stream import BinaryReader
+from pykotor.extract.capsule import Capsule
 from pykotor.gl.models.read_mdl import gl_load_mdl
 from pykotor.gl.scene import RenderObject, Scene
 from pykotor.resource.generics.git import GIT, GITCreature
+from pykotor.tools.misc import is_capsule_file, is_mod_file
+from pykotor.tools.model import detect_version
+from pykotor.tools.path import CaseAwarePath
 from PyQt5 import QtCore
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QAction, QOpenGLWidget, QWidget, QMessageBox
@@ -18,6 +24,8 @@ from utility.error_handling import assert_with_variable_trace
 from utility.logger_util import RobustRootLogger
 
 if TYPE_CHECKING:
+    import os
+
     from glm import vec3
     from pykotor.extract.installation import Installation
     from pykotor.resource.generics.utc import UTC
@@ -32,6 +40,11 @@ class ModelRenderer(QOpenGLWidget):
 
         self.scene: Scene | None = None
         self.installation: Installation | None = None
+        self.capsules: list[Capsule] = []
+        self.folders: list[CaseAwarePath] = []
+        self._source: CaseAwarePath | None = None
+        self._sourceInstallation: Installation | None = None
+        self._game = Game.K2
         self._modelToLoad: tuple[BinaryReader, BinaryReader] | None = None
         self._creatureToLoad: UTC | None = None
         self._modelData: tuple[bytes, bytes] | None = None
@@ -63,7 +76,10 @@ class ModelRenderer(QOpenGLWidget):
         camera = self.scene.camera if self.scene is not None else None
         if self.scene is not None:
             self.scene.executor.shutdown(wait=False)
-        self.scene = Scene(installation=self.installation)
+        self.scene = Scene(
+            installation=self.installation, game=self._game,
+            capsules=self.capsules, folders=self.folders,
+        )
         if camera is not None:
             self.scene.camera = camera
         else:
@@ -137,7 +153,30 @@ class ModelRenderer(QOpenGLWidget):
         if self.scene is not None and "model" in self.scene.objects:
             del self.scene.objects["model"]
 
-    def setModel(self, data: bytes, data_ext: bytes):
+    def setSource(self, filepath: os.PathLike | str | None):
+        source = None if filepath is None else CaseAwarePath.pathify(filepath)
+        if source == self._source and self.installation is self._sourceInstallation:
+            return
+        self._source, self._sourceInstallation = source, self.installation
+        self.folders = [] if source is None else [source.parent]
+        self.capsules = []
+        if source is not None and is_capsule_file(source):
+            self.capsules.append(Capsule(source))
+            if not is_mod_file(source):
+                root = Module.find_root(source).lower()
+                names = {root + suffix for suffix in (".rim", "_s.rim", "_dlg.erf")}
+                self.capsules.extend(
+                    Capsule(path) for path in sorted(source.parent.iterdir(), key=lambda path: path.name.lower())
+                    if path != source and path.name.lower() in names and path.is_file()
+                )
+        self._reloadSceneRequested = True
+
+    def setModel(self, data: bytes, data_ext: bytes, *, source: os.PathLike | str | None = None):
+        self.setSource(source)
+        game = detect_version(data)
+        if game != self._game:
+            self._game = game
+            self._reloadSceneRequested = True
         self._renderError = None
         self._renderTimer.start()
         self._modelData = (bytes(data), bytes(data_ext))
@@ -148,7 +187,8 @@ class ModelRenderer(QOpenGLWidget):
         mdx = BinaryReader.from_auto(data_ext)
         self._modelToLoad = mdl, mdx
 
-    def setCreature(self, utc: UTC):
+    def setCreature(self, utc: UTC, *, source: os.PathLike | str | None = None):
+        self.setSource(source)
         self._renderError = None
         self._renderTimer.start()
         self._modelData = None

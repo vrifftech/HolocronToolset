@@ -100,7 +100,7 @@ class MDLEditor(Editor):
             raise FileNotFoundError(f"Missing '{resref}.{companion_type.extension}' for the model")
         mdl_data, mdx_data = (data, companion_data) if restype == ResourceType.MDL else (companion_data, data)
         model = read_mdl(mdl_data, source_ext=mdx_data)
-        self.ui.modelRenderer.setModel(mdl_data, mdx_data)
+        self.ui.modelRenderer.setModel(mdl_data, mdx_data, source=c_filepath)
         self._mdl = model
         # Opening the companion still edits/saves the pair under its MDL identity.
         super().load(c_filepath, resref, ResourceType.MDL, mdl_data)

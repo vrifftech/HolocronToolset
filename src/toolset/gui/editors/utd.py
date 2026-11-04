@@ -264,9 +264,11 @@ class UTDEditor(Editor):
 
         data, _ = self.build()
         modelname: str = door.get_model(read_utd(data), self._installation, genericdoors=self._genericdoors2DA)
-        mdl: ResourceResult | None = self._installation.resource(modelname, ResourceType.MDL)
-        mdx: ResourceResult | None = self._installation.resource(modelname, ResourceType.MDX)
+        renderer = self.ui.previewRenderer
+        renderer.setSource(self._filepath)
+        mdl: ResourceResult | None = self._installation.resource(modelname, ResourceType.MDL, capsules=renderer.capsules, folders=renderer.folders)
+        mdx: ResourceResult | None = self._installation.resource(modelname, ResourceType.MDX, capsules=renderer.capsules, folders=renderer.folders)
         if mdl is not None and mdx is not None:
-            self.ui.previewRenderer.setModel(mdl.data, mdx.data)
+            self.ui.previewRenderer.setModel(mdl.data, mdx.data, source=self._filepath)
         else:
             self.ui.previewRenderer.clearModel()
