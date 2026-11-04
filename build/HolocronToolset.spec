@@ -57,7 +57,8 @@ a = Analysis([str(root / "build/entry.py")], pathex=[str(p) for p in sources],
              excludes=["PyQt6", "PySide2", "PySide6", "IPython", "pip", "pytest", "setuptools", "wheel"],
              noarchive=False)
 pyz = PYZ(a.pure)
-strip_enabled = sys.platform.startswith("linux") or sys.platform == "darwin"
+# GNU strip 2.38 corrupts the ELF layout of NumPy's bundled OpenBLAS library.
+strip_enabled = sys.platform == "darwin"
 version = project_version(root)
 options = dict(name="HolocronToolset", debug=False, bootloader_ignore_signals=False,
                strip=strip_enabled, upx=False, console=sys.platform.startswith("linux"),
