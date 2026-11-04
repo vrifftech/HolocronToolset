@@ -14,9 +14,9 @@ import platform
 import shutil
 import subprocess
 import sys
-import tarfile
 from datetime import datetime, timezone
 import urllib.request
+import zipfile
 
 from smoke_test import smoke_test
 from version_info import project_version
@@ -114,9 +114,10 @@ def build_appimage(payload: Path, release: Path, basename: str, *, gui: bool) ->
     run([str(appimagetool), "--runtime-file", str(runtime), str(appdir), str(executable)], env=env)
     executable.chmod(0o755)
     smoke_test(executable, gui=gui, appimage=True)
-    # Keep a permission-preserving copy as well as the requested .AppImage.
-    with tarfile.open(release / f"{basename}.AppImage.tar.gz", "w:gz") as archive:
-        archive.add(executable, arcname=executable.name)
+    # ZipFile preserves the AppImage's Unix executable mode in the archive.
+    with zipfile.ZipFile(release / f"{basename}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.write(executable, arcname=executable.name)
+    executable.unlink()
     return {"tools": lock, "payload": payload_report}
 
 
@@ -158,7 +159,8 @@ def main() -> None:
         onefile = frozen / "HolocronToolset.exe"
         payload_report = verify_onefile_payload(onefile)
         smoke_test(onefile, gui=gui)
-        shutil.copy2(onefile, release / f"{basename}.exe")
+        with zipfile.ZipFile(release / f"{basename}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.write(onefile, arcname=f"{basename}.exe")
     elif system == "Linux":
         onedir = frozen / "HolocronToolset"
         payload_report = verify_onedir_payload(onedir)
@@ -174,7 +176,7 @@ def main() -> None:
         # The app is an onedir bundle: support libraries remain inside Contents
         # and no PyInstaller onefile extraction occurs at launch.
         run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent",
-             str(app), str(release / f"{basename}.app.zip")])
+             str(app), str(release / f"{basename}.zip")])
 
     metadata = {
         "application": "HolocronToolset", "version": version, "target": args.target,

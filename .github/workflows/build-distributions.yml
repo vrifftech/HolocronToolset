@@ -177,20 +177,23 @@ jobs:
         env:
           BUILD_TARGET: ${{ matrix.target }}
         run: python build/build_distributions.py --target "$BUILD_TARGET"
-      - name: Upload verified application distributions
+      - name: Upload the application-only ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: HolocronToolset-${{ matrix.target }}
-          path: HolocronToolset/release/*
+          path: HolocronToolset/release/*.zip
+          archive: false
           if-no-files-found: error
-          compression-level: 0
           retention-days: 30
-      - name: Upload PyInstaller analysis
+      - name: Upload build reports and PyInstaller analysis
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: HolocronToolset-pyinstaller-${{ matrix.target }}-analysis
           path: |
+            HolocronToolset/release/build-provenance.json
+            HolocronToolset/release/build-environment.txt
+            HolocronToolset/release/fresh-pyinstaller.json
+            HolocronToolset/release/SHA256SUMS.txt
             HolocronToolset/.pyinstaller-build/**/HolocronToolset/Analysis-*.toc
             HolocronToolset/.pyinstaller-build/**/HolocronToolset/PYZ-*.toc
             HolocronToolset/.pyinstaller-build/**/HolocronToolset/PKG-*.toc
