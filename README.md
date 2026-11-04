@@ -3,6 +3,10 @@
 Holocron Toolset is a standalone mod tool and editor for Knights of the
 Old Republic resources.
 
+Support is offered in the OpenKotOR Discord.
+
+[![OpenKotOR Discord](https://discordapp.com/api/guilds/739590575359262792/widget.png?style=banner2)](https://discord.gg/OpenKotOR)
+
 ## Setup
 
 Running from source requires Python 3.10 or newer and a compatible PyKotor
