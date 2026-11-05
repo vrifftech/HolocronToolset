@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-import sys
+import logging
 
 from pykotor.common.misc import Game
 from pykotor.common.stream import BinaryReader, BinaryWriter
@@ -11,7 +11,6 @@ from pykotor.resource.formats.ncs.ncs_auto import bytes_ncs, compile_nss
 from pykotor.tools.path import CaseAwarePath
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 from toolset.gui.widgets.settings.installations import GlobalSettings, NoConfigurationSetError
-from utility.error_handling import format_exception_with_variables
 from utility.system.path import Path
 
 
@@ -71,11 +70,8 @@ def decompileScript(compiled: bytes, tsl: bool) -> str:
         if stderr:
             raise CompileError(stderr)  # noqa: TRY301
         return BinaryReader.load_file(tempDecompiledPath).decode(encoding="windows-1252")
-    except Exception as e:  # noqa: BLE001
-        with Path("errorlog.txt").open("a") as f:
-            msg = format_exception_with_variables(e)
-            print(msg, sys.stderr)  # noqa: T201
-            f.write(msg)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("Failed to decompile script '%s'", tempCompiledPath)
 
     return ""
 

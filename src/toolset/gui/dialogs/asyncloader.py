@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import CancelledError
+import logging
 from typing import Any, Callable
 
 from PyQt5 import QtCore
@@ -32,6 +33,7 @@ class AsyncWorker(QThread):
         except CancelledError:
             self.cancelled = True
         except Exception as error:
+            logging.getLogger(__name__).exception("Background task failed: %r", self._task)
             self.error = error
 
 
@@ -147,6 +149,7 @@ class AsyncBatchLoader(AsyncLoader):
             except CancelledError:
                 raise
             except Exception as error:
+                logging.getLogger(__name__).exception("Batch task failed: %r", task)
                 self.errors.append(error)
                 if self._cascade:
                     break

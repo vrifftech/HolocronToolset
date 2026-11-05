@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Callable
@@ -24,7 +25,7 @@ from toolset.gui.dialogs.save.to_bif import BifSaveDialog, BifSaveOption
 from toolset.gui.dialogs.save.to_module import SaveToModuleDialog
 from toolset.gui.dialogs.save.to_rim import RimSaveDialog, RimSaveOption
 from toolset.gui.widgets.settings.installations import GlobalSettings
-from utility.error_handling import assert_with_variable_trace, format_exception_with_variables, universal_simplify_exception
+from utility.error_handling import assert_with_variable_trace, universal_simplify_exception
 from utility.system.path import Path
 
 if TYPE_CHECKING:
@@ -252,12 +253,7 @@ class Editor(QMainWindow):
                         action.setEnabled(True)
             return bool(saved)
         except Exception as error:
-            details = format_exception_with_variables(error)
-            try:
-                with Path("errorlog.txt").open("a", encoding="utf-8") as log:
-                    log.write(details + "\n----------------------\n")
-            except OSError:
-                print(details)
+            logging.getLogger(__name__).exception("Failed to save resource '%s'", self._filepath)
             QMessageBox(QMessageBox.Critical, "Failed to write to file", str(universal_simplify_exception(error))).exec_()
             return False
         finally:
@@ -370,6 +366,7 @@ class Editor(QMainWindow):
         try:
             self._installation.reload_module(filename)
         except Exception as error:
+            logging.getLogger(__name__).exception("Saved module '%s', but refreshing it failed", filename)
             QMessageBox.warning(self, "File saved; refresh failed", str(universal_simplify_exception(error)))
 
     def open(self):    # noqa: A003

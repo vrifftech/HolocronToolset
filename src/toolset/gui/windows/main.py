@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
+import logging
 from tempfile import mkdtemp
 from typing import TYPE_CHECKING, Callable, ClassVar
 
@@ -16,6 +17,7 @@ from pykotor.tools.misc import is_bif_file, is_capsule_file, is_rim_file
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QCloseEvent, QIcon, QPixmap, QStandardItem
 from PyQt5.QtWidgets import QFileDialog, QMainWindow, QMessageBox, QTreeView
+from toolset.logging_setup import log_directory
 from toolset.data.installation import HTInstallation
 from toolset.gui.dialogs.about import About
 from toolset.gui.dialogs.asyncloader import AsyncBatchLoader, AsyncLoader
@@ -216,6 +218,10 @@ class ToolWindow(QMainWindow):
 
         self.ui.actionInstructions.triggered.connect(self.openInstructionsWindow)
         self.ui.actionHelpAbout.triggered.connect(self.openAboutDialog)
+        self._logFolderAction = self.ui.menuHelp.addAction("Open log folder")
+        self._logFolderAction.triggered.connect(
+            lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(log_directory())))
+        )
         self.ui.actionDiscordDeadlyStream.triggered.connect(lambda: openLink("https://discord.com/invite/bRWyshn"))
         self.ui.actionDiscordKotOR.triggered.connect(lambda: openLink("http://discord.gg/kotor"))
         self.ui.actionDiscordOpenKotOR.triggered.connect(lambda: openLink("https://discord.gg/openkotor"))
@@ -353,6 +359,7 @@ class ToolWindow(QMainWindow):
                 openResourceEditor(location.path, location.name, location.restype, data,
                                    installation, self, gff_specialized=useSpecializedEditor)
             except Exception as error:
+                logging.getLogger(__name__).exception("Failed to open resource '%s'", location.display)
                 QMessageBox.critical(self, "Unable to open resource", f"{location.display}\n{error}")
 
     # endregion
@@ -873,6 +880,7 @@ class ToolWindow(QMainWindow):
                     self,
                 )
             except ValueError as e:  # noqa: PERF203
+                logging.getLogger(__name__).exception("Failed to open file '%s'", filepath)
                 QMessageBox(QMessageBox.Critical, "Failed to open file", str(universal_simplify_exception(e))).exec_()
 
     # endregion

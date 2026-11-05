@@ -9,6 +9,7 @@ import os
 import sys
 from pathlib import Path
 from toolset.bootstrap import backend_info
+from toolset.logging_setup import configure_logging, install_qt_message_handler
 
 
 EDITORS = {
@@ -30,15 +31,9 @@ def is_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
-def onAppCrash(etype, error, traceback):
-    from utility.error_handling import format_exception_with_variables
-    with Path("errorlog.txt").open("a", encoding="utf-8") as log:
-        log.write(format_exception_with_variables(error, etype, traceback))
-    sys.__excepthook__(etype, error, traceback)
-
-
 def main():
     multiprocessing.freeze_support()
+    configure_logging()
     parser = argparse.ArgumentParser(description="Holocron Toolset")
     parser.add_argument("--backend-info", action="store_true", help="Print the selected backend paths without starting Qt")
     parser.add_argument("--editor", choices=sorted(EDITORS), help="Launch only the selected editor")
@@ -58,6 +53,7 @@ def main():
     file_path = args.file.expanduser().resolve() if args.file is not None else None
     game_path = game_path.expanduser().resolve() if game_path is not None else None
     from PyQt5.QtCore import QThread, Qt
+    install_qt_message_handler()
     from PyQt5.QtGui import QSurfaceFormat
     from PyQt5.QtWidgets import QApplication
     # The help browser uses paths relative to the application package.
@@ -77,7 +73,6 @@ def main():
     QSurfaceFormat.setDefaultFormat(surface_format)
     app = QApplication([sys.argv[0], *qt_args])
     app.thread().setPriority(QThread.HighestPriority)
-    sys.excepthook = onAppCrash
     import toolset.resources_rc
 
     if args.editor is None:
