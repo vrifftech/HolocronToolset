@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 class ModelRenderer(QOpenGLWidget):
     inputReset = QtCore.pyqtSignal()
     renderFailed = QtCore.pyqtSignal(str)
+    renderReset = QtCore.pyqtSignal()
     def __init__(self, parent: QWidget):
         super().__init__(parent)
 
@@ -49,6 +50,8 @@ class ModelRenderer(QOpenGLWidget):
         self._creatureToLoad: UTC | None = None
         self._modelData: tuple[bytes, bytes] | None = None
         self._creature: UTC | None = None
+        self.textureAssignments: dict[tuple[tuple[int, ...], str], str] = {}
+        self.showRenderErrors = True
         self._resetCameraOnLoad = False
 
         self._keysDown: set[int] = set()
@@ -123,7 +126,13 @@ class ModelRenderer(QOpenGLWidget):
             return
 
         if self._modelToLoad is not None:
-            self.scene.models["model"] = gl_load_mdl(self.scene, *self._modelToLoad)
+            model = gl_load_mdl(self.scene, *self._modelToLoad)
+            for (path, slot), texture in self.textureAssignments.items():
+                node = model.root
+                for index in path:
+                    node = node.children[index]
+                setattr(node.mesh, slot, texture)
+            self.scene.models["model"] = model
             self.scene.objects["model"] = RenderObject("model")
             if self._resetCameraOnLoad:
                 self.resetCamera()
@@ -144,6 +153,7 @@ class ModelRenderer(QOpenGLWidget):
 
     def clearModel(self):
         self._renderError = None
+        self.textureAssignments.clear()
         self.resetInput()
         self._modelData = None
         self._creature = None
@@ -173,6 +183,7 @@ class ModelRenderer(QOpenGLWidget):
 
     def setModel(self, data: bytes, data_ext: bytes, *, source: os.PathLike | str | None = None):
         self.setSource(source)
+        self.textureAssignments.clear()
         game = detect_version(data)
         if game != self._game:
             self._game = game
@@ -189,6 +200,7 @@ class ModelRenderer(QOpenGLWidget):
 
     def setCreature(self, utc: UTC, *, source: os.PathLike | str | None = None):
         self.setSource(source)
+        self.textureAssignments.clear()
         self._renderError = None
         self._renderTimer.start()
         self._modelData = None
@@ -196,6 +208,14 @@ class ModelRenderer(QOpenGLWidget):
         self._creature = utc
         self._creatureToLoad = utc
         self._resetCameraOnLoad = True
+
+    def setTextureAssignment(self, path: tuple[int, ...], slot: str, texture: str | None):
+        key = (path, slot)
+        if texture is None:
+            self.textureAssignments.pop(key, None)
+        else:
+            self.textureAssignments[key] = texture
+        self.reloadScene()
 
     def resetCamera(self):
         scene: Scene | None = self.scene
@@ -309,7 +329,8 @@ class ModelRenderer(QOpenGLWidget):
         self._renderTimer.stop()
         self.resetInput()
         self.renderFailed.emit(self._renderError)
-        QTimer.singleShot(0, self._showRenderError)
+        if self.showRenderErrors:
+            QTimer.singleShot(0, self._showRenderError)
 
     def _showRenderError(self):
         if self._renderError is not None and not self._renderErrorReported:
@@ -353,6 +374,7 @@ class ModelRenderer(QOpenGLWidget):
     def reloadScene(self):
         self.resetInput()
         self._renderError = None
+        self.renderReset.emit()
         # Recreate GPU caches on the next paint, when Qt owns the active context.
         self._reloadSceneRequested = True
         self._renderTimer.start()
