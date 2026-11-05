@@ -202,6 +202,15 @@ class InventoryEditor(QDialog):
                     item.resref = ResRef(widget.resname)
                 item.droppable, item.infinite = widget.droppable, widget.infinite
                 self.equipment[widget.slot] = item
+        selected_equipment = self.equipment
+        self.equipment = {
+            slot: selected_equipment[slot]
+            for slot in original_equipment if slot in selected_equipment
+        }
+        self.equipment.update(
+            (slot, item) for slot, item in selected_equipment.items()
+            if slot not in original_equipment
+        )
 
     def buildItems(self):
         """Builds item trees from a dialog.

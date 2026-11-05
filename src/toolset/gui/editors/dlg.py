@@ -406,7 +406,7 @@ class DLGEditor(Editor):
         self.refreshItem(item)
 
         if not alreadyListed:
-            for child_link in reversed(node.links):  # reversed = ascending order
+            for child_link in node.links:
                 child_item = QStandardItem()
                 self._loadDLGRec(child_item, child_link, seenLinks, seenNodes)
                 item.appendRow(child_item)
@@ -650,7 +650,7 @@ class DLGEditor(Editor):
         _copy_role_data: bool,
         item: QStandardItem | QStandardItemModel | None
     ):
-        newLink = DLGLink(source)
+        newLink = DLGLink(source, len(target_links))
         target_links.append(newLink)
         newItem = QStandardItem()
         newItem.setData(newLink, _LINK_ROLE)
@@ -674,8 +674,8 @@ class DLGEditor(Editor):
             - Creates a new item to hold the copied node
             - Loads the copied node recursively into the new item.
         """
-        sourceCopy: DLGNode = deepcopy(source)
-        newLink = DLGLink(sourceCopy)
+        sourceCopy: DLGNode = source.clone()
+        newLink = DLGLink(sourceCopy, len(target.links))
         target.links.append(newLink)
 
         newItem = QStandardItem()
@@ -933,6 +933,8 @@ class DLGEditor(Editor):
         )
         link: DLGLink = links.pop(oldRow)
         links.insert(newRow, link)
+        for index, link in enumerate(links):
+            link.list_index = index
 
     def onTreeContextMenu(self, point: QPoint):
         """Displays context menu for tree items.
