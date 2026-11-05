@@ -26,9 +26,6 @@ python -m pip install -r requirements.txt
 
 For offline installation, add `--no-index --find-links /path/to/wheels`.
 
-Select the backend explicitly with `HOLOCRON_PYKOTOR_ROOT` or `PYKOTOR_ROOT`.
-An adjacent checkout named `PyKotor` or `PyKotor-master` is also recognized.
-The application uses that source checkout rather than a pip-installed backend.
 
 On Windows:
 
